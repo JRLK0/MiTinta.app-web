@@ -1,0 +1,11 @@
+services:
+  lorcana-web:
+    build:
+      context: .
+      args:
+        VITE_SUPABASE_URL: ${VITE_SUPABASE_URL}
+        VITE_SUPABASE_PUBLISHABLE_KEY: ${VITE_SUPABASE_PUBLISHABLE_KEY}
+    image: lorcana-lector-web:latest
+    restart: unless-stopped
+    ports:
+      - "${LORCANA_WEB_PORT:-8080}:80"
