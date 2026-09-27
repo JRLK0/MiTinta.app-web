@@ -19,6 +19,9 @@ const CARDMARKET_SET_CODES: Record<string, string> = {
   '11': '11WSP',
   '12': '12WIL',
   '13': '13ATV',
+  '14': '14HPC',
+  'P4': 'PR4',
+  'CC1': 'CC1',
 }
 
 export const CARDMARKET_OPTIONAL_RARITIES = ['EPIC', 'ENCHANTED', 'ICONIC'] as const

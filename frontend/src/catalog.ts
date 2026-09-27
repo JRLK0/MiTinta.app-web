@@ -126,11 +126,25 @@ async function loadBundledCatalog() {
 
 let catalogPromise: Promise<CatalogCard[]> | null = null
 
+export function mergeCatalogs(remote: CatalogCard[], bundled: CatalogCard[]) {
+  const cards = new Map(remote.map((card) => [card.id, card]))
+  bundled.forEach((card) => {
+    const existing = cards.get(card.id)
+    cards.set(card.id, {
+      ...existing,
+      ...card,
+      normal_price_eur: existing?.normal_price_eur ?? card.normal_price_eur,
+      foil_price_eur: existing?.foil_price_eur ?? card.foil_price_eur,
+    })
+  })
+  return [...cards.values()]
+}
+
 export function loadCatalog() {
   catalogPromise ??= loadSupabaseCatalog().then(async (cards) => {
-    if (cards.length >= 3_000) return cards
     const bundled = await loadBundledCatalog()
-    return bundled.length ? bundled : loadLorcastCatalog()
+    if (bundled.length) return mergeCatalogs(cards, bundled)
+    return cards.length >= 3_000 ? cards : loadLorcastCatalog()
   })
   return catalogPromise
 }

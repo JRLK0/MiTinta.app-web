@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import { cardPrice, catalogReprints, effectiveCardFinish, isFoilOnlyRarity, type CatalogCard } from './catalog'
+import { cardPrice, catalogReprints, effectiveCardFinish, isFoilOnlyRarity, mergeCatalogs, type CatalogCard } from './catalog'
 
 const payload = JSON.parse(
   readFileSync(new URL('../public/catalog.json', import.meta.url), 'utf8'),
@@ -16,6 +16,29 @@ describe('bundled catalog', () => {
   it('keeps Cardmarket coverage above 95 percent', () => {
     const priced = payload.cards.filter((card) => card.normal_price_eur != null || card.foil_price_eur != null)
     expect(priced.length / payload.cards.length).toBeGreaterThan(.95)
+  })
+
+  it('includes the announced set and year 4 promotional collections', () => {
+    const bySet = new Map<string, number>()
+    payload.cards.forEach((card) => bySet.set(card.set_code, (bySet.get(card.set_code) ?? 0) + 1))
+    expect(bySet.get('14')).toBeGreaterThan(0)
+    expect(bySet.get('P4')).toBeGreaterThan(0)
+    expect(bySet.get('CC1')).toBeGreaterThan(0)
+  })
+})
+
+describe('catalog sources', () => {
+  it('adds bundled cards missing from Supabase and retains live prices', () => {
+    const remote = { ...card('old', 'Mickey', 'Brave', '13'), normal_price_eur: 2 }
+    const bundled = [
+      { ...remote, normal_price_eur: 1 },
+      card('new', 'Cinderella', 'New Arrival', '14'),
+      card('promo', 'Daisy Duck', 'Promo', 'P4'),
+    ]
+
+    const result = mergeCatalogs([remote], bundled)
+    expect(result.map((card) => card.id)).toEqual(['old', 'new', 'promo'])
+    expect(result[0].normal_price_eur).toBe(2)
   })
 })
 

@@ -58,6 +58,14 @@ describe('set collection helpers', () => {
     expect(result).toBe('1x Anna - Soothing Sister (11WSP)\r\n1x Elsa - Ice Artisan (11WSP)\r\n')
   })
 
+  it('uses Cardmarket expansion codes for the new collections', () => {
+    expect(cardmarketWantsText([
+      card('1', { set_code: '14', name: 'Hyperia' }),
+      card('1', { set_code: 'P4', name: 'Promo' }),
+      card('1', { set_code: 'CC1', name: 'Curator' }),
+    ])).toBe('1x Curator (CC1)\r\n1x Hyperia (14HPC)\r\n1x Promo (PR4)\r\n')
+  })
+
   it('marks epic, enchanted and iconic printings as Cardmarket version 2', () => {
     const result = cardmarketWantsText([
       card('205', { name: 'Tiana', version: 'Warm and Happy', rarity: 'Epic' }),
