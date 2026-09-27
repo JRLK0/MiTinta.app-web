@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
 import { RefreshCw, Search, Sparkles } from 'lucide-react'
-import { CardViewer } from './CardViewer'
+import { CardViewer, type AddCopy, type OwnershipForCard } from './CardViewer'
 import { cardPrice, cardTitle, catalogReprints, isFoilOnlyRarity, loadCatalog, type CatalogCard } from './catalog'
 import { CardFilterBar, COMMON_SORT_OPTIONS } from './CardFilterBar'
 import { EMPTY_CARD_FILTERS, filterCards, sortCards, type CardFilterState, type CommonSortMode, type FilterableCard } from './cardFilters'
 
-export function CatalogBrowser() {
+export function CatalogBrowser({ ownershipForCard, onAddCopy }: { ownershipForCard: OwnershipForCard; onAddCopy: AddCopy }) {
   const [cards, setCards] = useState<CatalogCard[]>([])
   const [filters, setFilters] = useState<CardFilterState>({ ...EMPTY_CARD_FILTERS })
   const [sort, setSort] = useState<CommonSortMode>('set')
@@ -40,6 +40,8 @@ export function CatalogBrowser() {
       printings={[selectedCard, ...(reprints.get(selectedCard.id) ?? [])].map(toViewerCard)}
       foil={isFoilOnlyRarity(selectedCard.rarity)}
       canToggleFoil={selectedCard.foil_price_eur != null}
+      ownershipForCard={ownershipForCard}
+      onAddCopy={onAddCopy}
       onClose={() => setSelectedCard(null)}
     />}
   </section>

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Check, ChevronDown, Copy, Download, Eye, Gem, Search, Sparkles, X } from 'lucide-react'
 import type { CollectionEntry } from './App'
-import { CardViewer, type ViewerCard } from './CardViewer'
+import { CardViewer, type AddCopy, type OwnershipForCard, type ViewerCard } from './CardViewer'
 import { cardPrice, cardTitle, loadCatalog, type CatalogCard } from './catalog'
 import { CARDMARKET_OPTIONAL_RARITIES, cardmarketWantsChunks, cardmarketWantsText, collectionQuantitiesByPrinting, compareCollectorNumbers, filterCardmarketWants, printingKey, safeSetFileName, type CardFinishQuantities, type CardmarketOptionalRarity } from './setCollection'
 
@@ -41,7 +41,7 @@ function setOrder(code: string) {
   return Number.isFinite(numeric) ? numeric : 10_000
 }
 
-export function SetCollectionView({ entries }: { entries: CollectionEntry[] }) {
+export function SetCollectionView({ entries, ownershipForCard, onAddCopy }: { entries: CollectionEntry[]; ownershipForCard: OwnershipForCard; onAddCopy: AddCopy }) {
   const [catalog, setCatalog] = useState<CatalogCard[]>([])
   const [loading, setLoading] = useState(true)
   const [query, setQuery] = useState('')
@@ -218,7 +218,7 @@ export function SetCollectionView({ entries }: { entries: CollectionEntry[] }) {
                 {displayedCards.map((card) => {
                   const isOwned = set.ownedIds.has(card.id)
                   const quantity = set.quantities.get(printingKey(card)) ?? { normal: 0, foil: 0, total: 0 }
-                  return <button className={isOwned ? 'owned' : 'missing'} key={card.id} onClick={() => setSelectedCard({ name: card.name, version: card.version, imageUrl: card.image_url, setCode: card.set_code, collectorNumber: card.collector_number, rarity: card.rarity, ink: card.ink, normalPriceEur: card.normal_price_eur, foilPriceEur: card.foil_price_eur, normalQuantity: quantity.normal, foilQuantity: quantity.foil })} title={`${cardTitle(card)}${isOwned ? ` · ${quantity.total} copias` : ''}`}>
+                  return <button className={isOwned ? 'owned' : 'missing'} key={card.id} onClick={() => setSelectedCard({ id: card.id, name: card.name, version: card.version, imageUrl: card.image_url, setCode: card.set_code, setName: card.set_name, collectorNumber: card.collector_number, rarity: card.rarity, ink: card.ink, normalPriceEur: card.normal_price_eur, foilPriceEur: card.foil_price_eur, normalQuantity: quantity.normal, foilQuantity: quantity.foil })} title={`${cardTitle(card)}${isOwned ? ` · ${quantity.total} copias` : ''}`}>
                   {card.image_url ? <img src={card.image_url} alt={cardTitle(card)} loading="lazy" /> : <Sparkles />}
                   <span className="set-card-number">#{card.collector_number}</span>
                   {isOwned && <span className="set-card-owned"><Check aria-hidden="true" />{set.normalIds.has(card.id) && set.foilIds.has(card.id) ? 'Normal + foil' : set.foilIds.has(card.id) ? 'Foil' : 'En colección'}</span>}
@@ -230,6 +230,6 @@ export function SetCollectionView({ entries }: { entries: CollectionEntry[] }) {
       })}
     </div>
     {visibleSets.length === 0 && <div className="sets-empty"><Sparkles /><h2>No hay sets con ese filtro</h2><p>Prueba otra búsqueda o cambia el estado.</p></div>}
-    {selectedCard && <CardViewer card={selectedCard} canToggleFoil onClose={() => setSelectedCard(null)} />}
+    {selectedCard && <CardViewer card={selectedCard} canToggleFoil ownershipForCard={ownershipForCard} onAddCopy={onAddCopy} onClose={() => setSelectedCard(null)} />}
   </section>
 }

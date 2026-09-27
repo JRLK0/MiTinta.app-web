@@ -1,6 +1,6 @@
 import { CSSProperties, PointerEvent, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { Gem, Move3D, Sparkles, X } from 'lucide-react'
+import { Gem, Move3D, Plus, Sparkles, X } from 'lucide-react'
 import { FoilProfile, foilHasTopLayer, foilMaskUrls, foilProfileFor } from './foilEffect'
 import { deviceTiltFromOrientation } from './cardMotion'
 import { isFoilOnlyRarity } from './catalog'
@@ -19,13 +19,19 @@ export type ViewerCard = {
   foilPriceEur?: number | null
   normalQuantity?: number
   foilQuantity?: number
+  language?: string
 }
+
+export type AddCopy = (card: ViewerCard, finish: 'NORMAL' | 'FOIL') => Promise<void>
+export type OwnershipForCard = (card: ViewerCard) => { normal: number; foil: number }
 
 type CardViewerProps = {
   card: ViewerCard
   foil?: boolean
   canToggleFoil?: boolean
   printings?: ViewerCard[]
+  ownershipForCard?: OwnershipForCard
+  onAddCopy?: AddCopy
   onClose: () => void
 }
 
@@ -47,9 +53,12 @@ function writeFoilMotion(element: HTMLElement, motion: FoilMotion) {
   element.style.setProperty('--combined', `${motion.combined}%`)
 }
 
-export function CardViewer({ card, foil = false, canToggleFoil = false, printings = [], onClose }: CardViewerProps) {
+export function CardViewer({ card, foil = false, canToggleFoil = false, printings = [], ownershipForCard, onAddCopy, onClose }: CardViewerProps) {
   const [activeCard, setActiveCard] = useState(card)
   const [foilMode, setFoilMode] = useState(foil)
+  const [adding, setAdding] = useState(false)
+  const [addMessage, setAddMessage] = useState('')
+  const [addError, setAddError] = useState('')
   const [motionAccess, setMotionAccess] = useState<MotionAccess>('checking')
   const [orientationEnabled, setOrientationEnabled] = useState(false)
   const cardElement = useRef<HTMLDivElement | null>(null)
@@ -72,11 +81,33 @@ export function CardViewer({ card, foil = false, canToggleFoil = false, printing
     ? `url("${import.meta.env.BASE_URL}foil-top-masks/${foilMasks.cardKey}.webp")`
     : undefined
   const hasSatinOverlay = satinOverlayProfiles.has(foilProfile)
+  const owned = ownershipForCard?.(activeCard) ?? { normal: activeCard.normalQuantity ?? 0, foil: activeCard.foilQuantity ?? 0 }
 
   useEffect(() => {
     setActiveCard(card)
     setFoilMode(foil)
   }, [card, foil])
+
+  useEffect(() => {
+    setAddMessage('')
+    setAddError('')
+  }, [activeCard.id, activeCard.setCode, activeCard.collectorNumber, foilMode])
+
+  async function addCopy() {
+    if (!onAddCopy || !activeCard.id || adding) return
+    const finish = effectiveFoilMode ? 'FOIL' : 'NORMAL'
+    setAdding(true)
+    setAddMessage('')
+    setAddError('')
+    try {
+      await onAddCopy(activeCard, finish)
+      setAddMessage(`1 copia ${finish === 'FOIL' ? 'foil' : 'normal'} añadida a tu colección`)
+    } catch (error) {
+      setAddError(error instanceof Error ? error.message : 'No se pudo añadir la copia.')
+    } finally {
+      setAdding(false)
+    }
+  }
 
   useEffect(() => {
     const previousOverflow = document.body.style.overflow
@@ -285,9 +316,9 @@ export function CardViewer({ card, foil = false, canToggleFoil = false, printing
           <p className="eyebrow">{activeCard.setCode ? `${activeCard.setCode} · #${activeCard.collectorNumber}` : 'Lorcana'}</p>
           <h2>{activeCard.name}</h2>
           <p className="viewer-version">{activeCard.version}</p>
-          {((activeCard.normalQuantity ?? 0) > 0 || (activeCard.foilQuantity ?? 0) > 0) && <div className="viewer-ownership" aria-label="Copias en tu colección">
-            <span><small>Normal</small><b>×{activeCard.normalQuantity ?? 0}</b></span>
-            <span className="foil"><Gem aria-hidden="true" /><small>Foil</small><b>×{activeCard.foilQuantity ?? 0}</b></span>
+          {(onAddCopy || owned.normal > 0 || owned.foil > 0) && <div className="viewer-ownership" aria-label="Copias en tu colección">
+            <span><small>Normal</small><b>×{owned.normal}</b></span>
+            <span className="foil"><Gem aria-hidden="true" /><small>Foil</small><b>×{owned.foil}</b></span>
           </div>}
           {printings.length > 1 && <div className="viewer-printings">
             <span>Impresiones</span>
@@ -317,6 +348,13 @@ export function CardViewer({ card, foil = false, canToggleFoil = false, printing
             {activeCard.ink && <span>{activeCard.ink}</span>}
           </div>
           <strong className="viewer-price">{price == null ? 'Sin precio' : price.toLocaleString('es-ES', { style: 'currency', currency: 'EUR' })}</strong>
+          {onAddCopy && <div className="viewer-add">
+            <button type="button" className="viewer-add-copy" onClick={() => void addCopy()} disabled={adding || !activeCard.id}>
+              <Plus aria-hidden="true" />{adding ? 'Añadiendo…' : `Añadir 1 ${effectiveFoilMode ? 'foil' : 'normal'} a mi colección`}
+            </button>
+            {addMessage && <p className="viewer-add-message" role="status">{addMessage}</p>}
+            {addError && <p className="viewer-add-error" role="alert">{addError}</p>}
+          </div>}
         </div>
       </section>
     </div>,

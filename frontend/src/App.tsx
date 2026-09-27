@@ -23,7 +23,7 @@ import {
 import { isConfigured, supabase } from './supabase'
 import { CatalogBrowser } from './CatalogBrowser'
 import { CardFilterBar, COMMON_SORT_OPTIONS } from './CardFilterBar'
-import { CardViewer } from './CardViewer'
+import { CardViewer, type AddCopy, type OwnershipForCard } from './CardViewer'
 import { cardPrice, effectiveCardFinish, loadCatalog, type CatalogCard } from './catalog'
 import { collectionCardForFilters, EMPTY_CARD_FILTERS, filterCards, sortCards, type CardFilterState, type CommonSortMode } from './cardFilters'
 import { DeckStudio, PublicDeck } from './DeckStudio'
@@ -33,6 +33,7 @@ import { loadAllPages } from './pagination'
 import { SetCollectionView } from './SetCollectionView'
 import { StarterDeckImporter } from './StarterDeckImporter'
 import { starterDeckTotals, type StarterDeck } from './starterDecks'
+import { collectionQuantitiesByPrinting, printingKey } from './setCollection'
 
 export type CollectionEntry = {
   user_id: string
@@ -370,6 +371,11 @@ function CollectionDashboard({ session }: { session: Session }) {
   }, [session.user.id])
 
   const catalogById = useMemo(() => new Map(catalogMetadata.map((card) => [card.id, card])), [catalogMetadata])
+  const quantitiesByPrinting = useMemo(() => collectionQuantitiesByPrinting(entries), [entries])
+  const ownershipForCard: OwnershipForCard = (card) => {
+    const quantity = quantitiesByPrinting.get(printingKey({ set_code: card.setCode ?? '', collector_number: card.collectorNumber ?? '' }))
+    return { normal: quantity?.normal ?? 0, foil: quantity?.foil ?? 0 }
+  }
   const collectionFilterCards = useMemo(() => entries.map((entry) => collectionCardForFilters(entry, catalogById.get(entry.card_id))), [catalogById, entries])
   const entryByKey = useMemo(() => new Map(entries.map((entry) => [collectionEntryKey(entry), entry])), [entries])
   const visibleEntries = useMemo(() => {
@@ -474,6 +480,46 @@ function CollectionDashboard({ session }: { session: Session }) {
     }
   }
 
+  const addCopy: AddCopy = async (card, requestedFinish) => {
+    if (!card.id || !card.setCode || !card.collectorNumber) throw new Error('Faltan datos para añadir esta carta.')
+    const source = catalogById.get(card.id)
+    const finish = effectiveCardFinish(source?.rarity ?? card.rarity, requestedFinish)
+    const language = card.language ?? 'en'
+    const identity = { card_id: card.id, language, finish }
+    const { data: existing, error: readError } = await supabase
+      .from('collection_entries')
+      .select('quantity')
+      .eq('user_id', session.user.id)
+      .eq('card_id', card.id)
+      .eq('language', language)
+      .eq('finish', finish)
+      .maybeSingle()
+    if (readError) throw readError
+    const quantity = (existing?.quantity ?? 0) + 1
+    const key = collectionEntryKey(identity)
+    localQuantityUpdates.current.set(key, quantity)
+    const { error: writeError } = await supabase.from('collection_entries').upsert({
+      user_id: session.user.id,
+      ...identity,
+      quantity,
+      card_name: source?.name ?? card.name,
+      card_version: source?.version ?? card.version,
+      set_code: source?.set_code ?? card.setCode,
+      set_name: source?.set_name ?? card.setName ?? card.setCode,
+      collector_number: source?.collector_number ?? card.collectorNumber,
+      image_url: source?.image_url ?? card.imageUrl,
+      ink: source?.ink ?? card.ink ?? null,
+      rarity: source?.rarity ?? card.rarity ?? '',
+      normal_price_eur: source?.normal_price_eur ?? card.normalPriceEur ?? null,
+      foil_price_eur: source?.foil_price_eur ?? card.foilPriceEur ?? null,
+    }, { onConflict: 'user_id,card_id,language,finish' })
+    if (writeError) {
+      localQuantityUpdates.current.delete(key)
+      throw writeError
+    }
+    await loadCollection()
+  }
+
   async function deleteAccount() {
     const confirmed = window.confirm(
       'Se eliminarán permanentemente tu cuenta y toda la colección sincronizada. Esta acción no se puede deshacer.',
@@ -569,10 +615,10 @@ function CollectionDashboard({ session }: { session: Session }) {
               })}
             </section>
           )}
-          </> : <SetCollectionView entries={entries} />}
-        </> : activeView === 'catalog' ? <CatalogBrowser /> : <DeckStudio session={session} collection={entries} />}
+          </> : <SetCollectionView entries={entries} ownershipForCard={ownershipForCard} onAddCopy={addCopy} />}
+        </> : activeView === 'catalog' ? <CatalogBrowser ownershipForCard={ownershipForCard} onAddCopy={addCopy} /> : <DeckStudio session={session} collection={entries} ownershipForCard={ownershipForCard} onAddCopy={addCopy} />}
       </main>
-      {selectedEntry && <CardViewer card={{ name: selectedEntry.card_name, version: selectedEntry.card_version, imageUrl: selectedEntry.image_url, setCode: selectedEntry.set_code, collectorNumber: selectedEntry.collector_number, rarity: selectedEntry.rarity, ink: selectedEntry.ink, normalPriceEur: selectedEntry.normal_price_eur, foilPriceEur: selectedEntry.foil_price_eur }} foil={effectiveCardFinish(selectedEntry.rarity, selectedEntry.finish) === 'FOIL'} onClose={() => setSelectedEntry(null)} />}
+      {selectedEntry && <CardViewer card={{ id: selectedEntry.card_id, name: selectedEntry.card_name, version: selectedEntry.card_version, imageUrl: selectedEntry.image_url, setCode: selectedEntry.set_code, setName: selectedEntry.set_name, collectorNumber: selectedEntry.collector_number, rarity: selectedEntry.rarity, ink: selectedEntry.ink, normalPriceEur: selectedEntry.normal_price_eur, foilPriceEur: selectedEntry.foil_price_eur, language: selectedEntry.language }} foil={effectiveCardFinish(selectedEntry.rarity, selectedEntry.finish) === 'FOIL'} canToggleFoil ownershipForCard={ownershipForCard} onAddCopy={addCopy} onClose={() => setSelectedEntry(null)} />}
       {arrivalCelebration && <ScanArrivalCelebration key={arrivalCelebration.nonce} entry={arrivalCelebration.entry} jackpot={arrivalCelebration.jackpot} />}
       {starterImporterOpen && <StarterDeckImporter catalog={catalogMetadata} busy={starterImportBusy} onClose={() => setStarterImporterOpen(false)} onImport={importStarterDeck} />}
     </div>
