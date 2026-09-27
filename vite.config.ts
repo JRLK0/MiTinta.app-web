@@ -9,8 +9,11 @@ function normalizeBase(value: string | undefined) {
   return `${configured.replace(/\/+$/, '')}/`
 }
 
-export default defineConfig(({ mode }) => {
+export default defineConfig(({ command, mode }) => {
   const env = loadEnv(mode, '.', '')
+  if (command === 'build' && (!env.VITE_SUPABASE_URL || !env.VITE_SUPABASE_PUBLISHABLE_KEY)) {
+    throw new Error('Falta VITE_SUPABASE_URL o VITE_SUPABASE_PUBLISHABLE_KEY para compilar la web')
+  }
   return {
     root: 'frontend',
     plugins: [react()],
