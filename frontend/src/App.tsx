@@ -7,6 +7,7 @@ import {
   Layers3,
   LibraryBig,
   ListChecks,
+  PackagePlus,
   Rows3,
   LogOut,
   Minus,
@@ -30,6 +31,8 @@ import { playValuableCardSound, prepareValuableCardSound, valuableCardSoundFor }
 import { parsePriceHistory, priceTrendFor, updatePriceHistory, type PriceHistory } from './priceHistory'
 import { loadAllPages } from './pagination'
 import { SetCollectionView } from './SetCollectionView'
+import { StarterDeckImporter } from './StarterDeckImporter'
+import { starterDeckTotals, type StarterDeck } from './starterDecks'
 
 export type CollectionEntry = {
   user_id: string
@@ -239,6 +242,9 @@ function CollectionDashboard({ session }: { session: Session }) {
   const [sort, setSort] = useState<CollectionSortMode>('recent')
   const [activeView, setActiveView] = useState<CollectionView>('collection')
   const [collectionMode, setCollectionMode] = useState<CollectionMode>('cards')
+  const [starterImporterOpen, setStarterImporterOpen] = useState(false)
+  const [starterImportBusy, setStarterImportBusy] = useState(false)
+  const [starterImportMessage, setStarterImportMessage] = useState('')
   const [cardSize, setCardSize] = useState(() => {
     const saved = Number(window.localStorage.getItem('lorcana-card-size'))
     return Number.isFinite(saved) && saved >= CARD_SIZE_MIN && saved <= CARD_SIZE_MAX ? saved : 170
@@ -253,6 +259,7 @@ function CollectionDashboard({ session }: { session: Session }) {
   const soundEnabledRef = useRef(soundEnabled)
   const arrivalTimers = useRef<Map<string, number>>(new Map())
   const localQuantityUpdates = useRef<Map<string, number>>(new Map())
+  const starterImportInFlight = useRef(false)
   const collectionRequestId = useRef(0)
 
   useEffect(() => {
@@ -424,6 +431,49 @@ function CollectionDashboard({ session }: { session: Session }) {
     }
   }
 
+  async function importStarterDeck(deck: StarterDeck, language: string) {
+    if (starterImportInFlight.current) return
+    if (deck.missing.length || starterDeckTotals(deck).copies !== 60) throw new Error('El mazo no está completo en el catálogo.')
+    starterImportInFlight.current = true
+    setStarterImportBusy(true)
+    try {
+      const cardIds = deck.cards.map(({ card }) => card.id)
+      const { data: stored, error: readError } = await supabase
+        .from('collection_entries')
+        .select('card_id,language,finish,quantity')
+        .eq('user_id', session.user.id)
+        .eq('language', language)
+        .in('card_id', cardIds)
+      if (readError) throw readError
+      const existing = new Map((stored ?? []).map((entry) => [`${entry.card_id}-${entry.language}-${entry.finish}`, entry.quantity as number]))
+      const rows = deck.cards.map(({ card, quantity, finish }) => ({
+        user_id: session.user.id,
+        card_id: card.id,
+        language,
+        finish,
+        quantity: (existing.get(`${card.id}-${language}-${finish}`) ?? 0) + quantity,
+        card_name: card.name,
+        card_version: card.version,
+        set_code: card.set_code,
+        set_name: card.set_name,
+        collector_number: card.collector_number,
+        image_url: card.image_url,
+        ink: card.ink,
+        rarity: card.rarity,
+        normal_price_eur: card.normal_price_eur,
+        foil_price_eur: card.foil_price_eur,
+      }))
+      const { error: writeError } = await supabase.from('collection_entries').upsert(rows, { onConflict: 'user_id,card_id,language,finish' })
+      if (writeError) throw writeError
+      setStarterImportMessage(`${deck.name}: ${starterDeckTotals(deck).copies} cartas añadidas, incluidas ${starterDeckTotals(deck).foil} foil.`)
+      setStarterImporterOpen(false)
+      await loadCollection()
+    } finally {
+      starterImportInFlight.current = false
+      setStarterImportBusy(false)
+    }
+  }
+
   async function deleteAccount() {
     const confirmed = window.confirm(
       'Se eliminarán permanentemente tu cuenta y toda la colección sincronizada. Esta acción no se puede deshacer.',
@@ -473,12 +523,14 @@ function CollectionDashboard({ session }: { session: Session }) {
             <button className={activeView === 'catalog' ? 'active' : ''} onClick={() => setActiveView('catalog')}><LibraryBig aria-hidden="true" />Catálogo</button>
             <button className={activeView === 'decks' ? 'active' : ''} onClick={() => setActiveView('decks')}><ListChecks aria-hidden="true" />Mazos</button>
           </nav>
+          {activeView === 'collection' && <button className="starter-import-open" onClick={() => { setStarterImportMessage(''); setStarterImporterOpen(true) }} disabled={catalogMetadata.length === 0} title="Importar mazo comprado"><PackagePlus aria-hidden="true" /><span>Importar mazo comprado</span></button>}
           {activeView === 'collection' && <button className="export-command" onClick={downloadDreambornCsv} disabled={entries.length === 0} title="Exportar a Dreamborn" aria-label="Exportar a Dreamborn">
             <Download aria-hidden="true" /><span>Exportar a Dreamborn</span>
           </button>}
         </section>
 
         {error && <p className="notice error">No se pudo actualizar la colección: {error}</p>}
+        {activeView === 'collection' && starterImportMessage && <p className="notice success" role="status">{starterImportMessage}</p>}
         {loading ? <LoadingScreen /> : activeView === 'collection' ? <>
           <section className="collection-overview" aria-label="Resumen de la colección">
             <Stat label="Cartas distintas" value={stats.unique.toLocaleString('es-ES')} />
@@ -522,6 +574,7 @@ function CollectionDashboard({ session }: { session: Session }) {
       </main>
       {selectedEntry && <CardViewer card={{ name: selectedEntry.card_name, version: selectedEntry.card_version, imageUrl: selectedEntry.image_url, setCode: selectedEntry.set_code, collectorNumber: selectedEntry.collector_number, rarity: selectedEntry.rarity, ink: selectedEntry.ink, normalPriceEur: selectedEntry.normal_price_eur, foilPriceEur: selectedEntry.foil_price_eur }} foil={effectiveCardFinish(selectedEntry.rarity, selectedEntry.finish) === 'FOIL'} onClose={() => setSelectedEntry(null)} />}
       {arrivalCelebration && <ScanArrivalCelebration key={arrivalCelebration.nonce} entry={arrivalCelebration.entry} jackpot={arrivalCelebration.jackpot} />}
+      {starterImporterOpen && <StarterDeckImporter catalog={catalogMetadata} busy={starterImportBusy} onClose={() => setStarterImporterOpen(false)} onImport={importStarterDeck} />}
     </div>
   )
 }
