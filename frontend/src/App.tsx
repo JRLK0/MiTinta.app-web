@@ -498,21 +498,27 @@ function CollectionDashboard({ session }: { session: Session }) {
     const quantity = (existing?.quantity ?? 0) + 1
     const key = collectionEntryKey(identity)
     localQuantityUpdates.current.set(key, quantity)
-    const { error: writeError } = await supabase.from('collection_entries').upsert({
-      user_id: session.user.id,
-      ...identity,
-      quantity,
-      card_name: source?.name ?? card.name,
-      card_version: source?.version ?? card.version,
-      set_code: source?.set_code ?? card.setCode,
-      set_name: source?.set_name ?? card.setName ?? card.setCode,
-      collector_number: source?.collector_number ?? card.collectorNumber,
-      image_url: source?.image_url ?? card.imageUrl,
-      ink: source?.ink ?? card.ink ?? null,
-      rarity: source?.rarity ?? card.rarity ?? '',
-      normal_price_eur: source?.normal_price_eur ?? card.normalPriceEur ?? null,
-      foil_price_eur: source?.foil_price_eur ?? card.foilPriceEur ?? null,
-    }, { onConflict: 'user_id,card_id,language,finish' })
+    const { error: writeError } = existing
+      ? await supabase.from('collection_entries').update({ quantity })
+        .eq('user_id', session.user.id)
+        .eq('card_id', card.id)
+        .eq('language', language)
+        .eq('finish', finish)
+      : await supabase.from('collection_entries').insert({
+        user_id: session.user.id,
+        ...identity,
+        quantity,
+        card_name: source?.name ?? card.name,
+        card_version: source?.version ?? card.version,
+        set_code: source?.set_code ?? card.setCode,
+        set_name: source?.set_name ?? card.setName ?? card.setCode,
+        collector_number: source?.collector_number ?? card.collectorNumber,
+        image_url: source?.image_url ?? card.imageUrl,
+        ink: source?.ink ?? card.ink ?? null,
+        rarity: source?.rarity ?? card.rarity ?? '',
+        normal_price_eur: source?.normal_price_eur ?? card.normalPriceEur ?? null,
+        foil_price_eur: source?.foil_price_eur ?? card.foilPriceEur ?? null,
+      })
     if (writeError) {
       localQuantityUpdates.current.delete(key)
       throw writeError
