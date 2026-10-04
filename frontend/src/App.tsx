@@ -1,3 +1,4 @@
+import { ThemeToggle } from '../../shared/ThemeToggle'
 import { CSSProperties, FormEvent, useEffect, useMemo, useRef, useState } from 'react'
 import type { Session } from '@supabase/supabase-js'
 import {
@@ -160,6 +161,7 @@ function AuthScreen() {
 
   return (
     <main className="auth-shell">
+      <div className="auth-theme"><ThemeToggle /></div>
       <section className="auth-panel" aria-labelledby="auth-title">
         <div className="brand-lockup">
           <span className="brand-mark"><img src={`${import.meta.env.BASE_URL}ink-icons/amethyst.png`} alt="" width="30" height="30" /></span>
@@ -220,6 +222,7 @@ function PasswordRecoveryScreen({ onComplete }: { onComplete: () => void }) {
   }
 
   return <main className="recovery-shell">
+    <div className="auth-theme"><ThemeToggle /></div>
     <section className="recovery-panel" aria-labelledby="recovery-title">
       <div className="brand-lockup"><span className="brand-mark"><img src={`${import.meta.env.BASE_URL}ink-icons/amethyst.png`} alt="" width="30" height="30" /></span><div><p className="eyebrow">MiTinta</p><h1 id="recovery-title">Nueva contraseña</h1></div></div>
       <form onSubmit={updatePassword}>
@@ -548,7 +551,7 @@ function CollectionDashboard({ session }: { session: Session }) {
           <span className="brand-mark"><img src={`${import.meta.env.BASE_URL}ink-icons/amethyst.png`} alt="" width="30" height="30" /></span>
           <div><span className="app-brand-name">MiTinta</span><strong className="current-view-label">{activeViewLabel}<i title="Sincronización activa" aria-label="Sincronización activa" /></strong></div>
         </div>
-        <AccountMenu
+        <div className="header-actions"><ThemeToggle /><AccountMenu
           email={session.user.email ?? ''}
           soundEnabled={soundEnabled}
           onToggleSound={() => {
@@ -558,7 +561,7 @@ function CollectionDashboard({ session }: { session: Session }) {
           }}
           onDeleteAccount={() => void deleteAccount()}
           onSignOut={() => void supabase.auth.signOut()}
-        />
+        /></div>
       </header>
 
       <main className={`collection-main view-${activeView}`}>

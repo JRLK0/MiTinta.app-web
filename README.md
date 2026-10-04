@@ -19,3 +19,5 @@ La importación de mazos comprados usa las listas de [LorcanaJSON](https://lorca
 ## Diseño web
 
 La web usa un tema claro, tipografía de sistema y un acento amatista. Los filtros comunes están en un panel lateral en escritorio y una hoja en móvil; búsqueda, ordenación, selecciones activas y resultados permanecen visibles. La colección agrupa importación y exportación bajo «Acciones». Los símbolos de coste del catálogo y de los filtros comparten el recurso oficial. La app Android mantiene su estética actual.
+
+El selector claro/oscuro comparte `frontend/public/theme.js` y `theme.css`, con paletas en `shared/tokens.css`. Guarda `mitinta-theme` en localStorage y sincroniza pestañas; el tema claro es el predeterminado.

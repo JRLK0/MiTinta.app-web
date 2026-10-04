@@ -2,7 +2,7 @@
   color-scheme: light;
   --paper: #ffffff; --surface: #ffffff; --surface-raised: #f5f5f7; --surface-glass: #ffffff;
   --ink: #1d1d1f; --muted: #626269; --line: #e4e4e9; --line-bright: #c6c6cf;
-  --accent: #7040a0; --accent-hover: #5d3288; --accent-soft: #f3edf8;
+  --on-accent: #ffffff; --accent: #7040a0; --accent-hover: #5d3288; --accent-soft: #f3edf8;
   --success: #206347; --success-soft: #edf6f1; --danger: #a32d3d; --danger-soft: #fbedef;
   /* Compatibility aliases for the existing components. */
   --carbon-0: var(--paper); --carbon-1: var(--surface-raised); --carbon-2: var(--surface); --carbon-3: #ededf0; --carbon-4: var(--line-bright);
@@ -20,3 +20,14 @@
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 html { scrollbar-color: #bcbcc5 var(--surface-raised); scrollbar-width: thin; }
 input, textarea { caret-color: var(--accent); }
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --paper: #151518; --surface: #1e1e23; --surface-raised: #28282f; --surface-glass: #1e1e23;
+  --ink: #f5f5f7; --muted: #b7b7c1; --line: #393940; --line-bright: #62626f;
+  --accent: #c7a1f0; --accent-hover: #d5b5f4; --accent-soft: #35273f; --on-accent: #20122d;
+  --success: #8fd3ad; --success-soft: #20352a; --danger: #f4a0aa; --danger-soft: #3b242b;
+  --carbon-3: #303038;
+  --shadow-soft: 0 12px 32px rgba(0,0,0,.3); --shadow-card: 0 8px 22px rgba(0,0,0,.25);
+}
+:root[data-theme="dark"] ::selection { color: var(--ink); background: #59416e; }

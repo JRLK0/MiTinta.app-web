@@ -1,0 +1,12 @@
+.theme-toggle { display: inline-flex; align-items: center; justify-content: center; gap: 7px; flex: none; min-width: 44px; min-height: 44px; padding: 0 12px; border: 1px solid var(--line); border-radius: 10px; color: var(--ink); background: var(--surface); font: 500 13px/1 var(--font-ui); cursor: pointer; }
+.theme-toggle:hover { background: var(--surface-raised); }
+.theme-toggle:active { transform: scale(.97); }
+.theme-toggle svg { width: 17px; height: 17px; }
+.theme-light-label, :root[data-theme="dark"] .theme-dark-label { display: none; }
+:root[data-theme="dark"] .theme-light-label { display: inline-flex; align-items: center; gap: 7px; }
+.theme-dark-label { display: inline-flex; align-items: center; gap: 7px; }
+.header-actions { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.auth-shell, .recovery-shell { position: relative; }
+.auth-theme { position: absolute; top: 16px; right: 20px; z-index: 2; }
+.privacy-tools { display: flex; justify-content: flex-end; margin-bottom: 24px; }
+@media (max-width: 560px) { .header-actions { gap: 6px; } .header-actions .theme-toggle { padding: 0; width: 44px; } .header-actions .theme-toggle .theme-label { display: none; } }

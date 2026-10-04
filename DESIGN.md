@@ -170,3 +170,5 @@ Búsqueda, orden y Filtros permanentes. El drawer/hoja reúne filtros adicionale
 - Don't recuperar el tema oscuro ni añadir selector de temas en la web.
 - Don't inventar logo, ilustraciones, testimonios o cifras de producto.
 - Don't cambiar el texto legal ni la estética Android dentro de este sistema web.
+
+Tema oscuro: utiliza las mismas superficies y componentes con tokens de `shared/tokens.css`; el selector guarda la elección localmente y la aplica antes del primer render mediante `theme.js`.

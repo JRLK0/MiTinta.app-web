@@ -10,7 +10,7 @@ h1, h2, h3 { letter-spacing: -.035em; font-weight: 650; text-wrap: balance; }
 .site-brand img { object-fit: contain; }
 .site-header nav { display: flex; gap: 28px; margin-left: auto; font-size: 13px; color: var(--muted); }
 .site-header nav a:hover, .site-footer a:hover { color: var(--accent); }
-.button { min-height: 48px; padding: 0 23px; display: inline-flex; justify-content: center; align-items: center; gap: 12px; border-radius: var(--radius-pill); background: var(--accent); color: #fff; font-size: 15px; font-weight: 600; transition: background 160ms, transform 160ms var(--ease-out); }
+.button { min-height: 48px; padding: 0 23px; display: inline-flex; justify-content: center; align-items: center; gap: 12px; border-radius: var(--radius-pill); background: var(--accent); color: var(--on-accent); font-size: 15px; font-weight: 600; transition: background 160ms, transform 160ms var(--ease-out); }
 .button:hover { background: var(--accent-hover); }
 .button:active { transform: scale(.98); }
 .button svg, .text-link svg { width: 17px; height: 17px; }

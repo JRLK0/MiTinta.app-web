@@ -373,9 +373,16 @@
       "Do agrupar tareas secundarias y dar espacio al contenido."
     ],
     "donts": [
-      "Don't recuperar el tema oscuro ni añadir selector de temas en la web.",
+      "Usar el selector claro/oscuro con elección persistida; claro predeterminado.",
       "Don't inventar logo, ilustraciones, testimonios o cifras de producto.",
       "Don't cambiar el texto legal ni la estética Android dentro de este sistema web."
     ]
+  },
+  "themeModes": {
+    "default": "light",
+    "storageKey": "mitinta-theme",
+    "darkTokensSource": "shared/tokens.css",
+    "selector": "shared/ThemeToggle.tsx",
+    "bootstrap": "frontend/public/theme.js"
   }
 }

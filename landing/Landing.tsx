@@ -1,3 +1,4 @@
+import { ThemeToggle } from '../shared/ThemeToggle'
 import { ArrowRight, Check, Layers3, LibraryBig, ListChecks } from 'lucide-react'
 
 const CARDS = [
@@ -18,7 +19,7 @@ export function Landing() {
     <header className="site-header">
       <a className="site-brand" href={base} aria-label="MiTinta, inicio"><img src={`${base}ink-icons/amethyst.png`} alt="" width="28" height="28" />MiTinta</a>
       <nav aria-label="Navegación principal"><a href="#funciones">Funciones</a><a href={`${base}privacy/`}>Privacidad</a></nav>
-      <a className="button small" href={collection}>Abrir colección<ArrowRight aria-hidden="true" /></a>
+      <div className="header-actions"><ThemeToggle /><a className="button small" href={collection}>Abrir colección<ArrowRight aria-hidden="true" /></a></div>
     </header>
     <main>
       <section className="hero" aria-labelledby="hero-title">

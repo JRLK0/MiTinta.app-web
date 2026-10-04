@@ -50,4 +50,6 @@ La carta escaneada en el móvil aparece en la web en tiempo real, con aviso y so
 5. Honestidad: precios orientativos, herramienta no oficial, sin cifras inventadas.
 
 ## Accessibility & Inclusion
-Contraste WCAG AA en el tema claro, controles cómodos de pulsar en móvil, navegación por teclado y respeto de `prefers-reduced-motion`.
+Contraste WCAG AA en ambos temas, controles cómodos de pulsar en móvil, navegación por teclado y respeto de `prefers-reduced-motion`.
+
+Tema oscuro: utiliza las mismas superficies y componentes con tokens de `shared/tokens.css`; el selector guarda la elección localmente y la aplica antes del primer render mediante `theme.js`.
