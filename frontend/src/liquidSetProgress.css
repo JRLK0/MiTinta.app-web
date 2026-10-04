@@ -41,6 +41,9 @@
   position: absolute;
   inset: -4px 0;
   overflow: hidden;
+  /* Fade only the moving overlay, keeping the percentage endpoint crisp.
+     Percentage caps preserve the effect on very short completed portions. */
+  mask-image: linear-gradient(to right, transparent, #000 min(8px, 20%), #000 calc(100% - min(18px, 35%)), transparent);
   pointer-events: none;
 }
 .liquid-progress-current {
