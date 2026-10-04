@@ -22,8 +22,8 @@ export function LiquidSetProgress({ value, label, variant, phase }: {
   return <span ref={ref} className={`set-progress ${variant} liquid-progress${visible && progress > 0 ? ' flowing' : ''}`} style={{ '--ink-phase': `${-phase * 0.73}s` } as CSSProperties}>
     <span className="liquid-progress-track" aria-hidden="true">
       <span className="liquid-progress-fill" style={{ width: `${progress}%` }}>
-        <span className="liquid-progress-wave back" />
-        <span className="liquid-progress-wave front" />
+        <span className="liquid-progress-current back" />
+        <span className="liquid-progress-current front" />
       </span>
     </span>
     <span><em>{label}</em><strong>{progress}%</strong></span>

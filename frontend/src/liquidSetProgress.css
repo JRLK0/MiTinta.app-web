@@ -1,27 +1,27 @@
 .liquid-progress {
   --ink-body: #7040a0;
-  --ink-deep: #452269;
-  --ink-light: #c0a0df;
+  --ink-deep: #60358d;
+  --ink-light: #9470b6;
 }
 .liquid-progress.master {
   --ink-body: #8d648e;
-  --ink-deep: #634265;
-  --ink-light: #d9b7d3;
+  --ink-deep: #79537d;
+  --ink-light: #ac89aa;
 }
 :root[data-theme="dark"] .liquid-progress {
   --ink-body: #a477ce;
-  --ink-deep: #704598;
-  --ink-light: #dfc4f4;
+  --ink-deep: #9063ba;
+  --ink-light: #bc96df;
 }
 :root[data-theme="dark"] .liquid-progress.master {
   --ink-body: #b68fb3;
-  --ink-deep: #805e83;
-  --ink-light: #eed0e5;
+  --ink-deep: #9e78a2;
+  --ink-light: #cba8c5;
 }
 .set-progress > .liquid-progress-track {
   position: relative;
   display: block;
-  height: 9px;
+  height: 7px;
   overflow: hidden;
   border-radius: 999px;
   background: var(--line);
@@ -33,30 +33,44 @@
   height: 100%;
   overflow: hidden;
   border-radius: inherit;
-  background: linear-gradient(180deg, var(--ink-light), var(--ink-body) 55%, var(--ink-deep));
+  background: linear-gradient(180deg, var(--ink-body), var(--ink-deep));
 }
-.liquid-progress-wave {
+.liquid-progress-current {
   position: absolute;
-  inset: -3px -96px 0 0;
+  inset: -65% -35%;
   background-color: var(--ink-light);
-  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='96' height='16' viewBox='0 0 96 16'%3E%3Cpath d='M0 6C12 6 12 1 24 1S36 11 48 11S60 1 72 1S84 6 96 6V16H0Z'/%3E%3C/svg%3E") repeat-x left top / 96px 16px;
-  opacity: .48;
-  animation: set-ink-flow 5.6s linear infinite;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='600' height='80' viewBox='0 0 600 80' preserveAspectRatio='none'%3E%3Cdefs%3E%3Cfilter id='d' x='-20%25' y='-100%25' width='140%25' height='300%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.012 .065' numOctaves='2' seed='8' result='n'/%3E%3CfeDisplacementMap in='SourceGraphic' in2='n' scale='38' xChannelSelector='R' yChannelSelector='G'/%3E%3CfeGaussianBlur stdDeviation='3 1.5'/%3E%3C/filter%3E%3C/defs%3E%3Cg filter='url(%23d)' fill='none' stroke='white' stroke-linecap='round'%3E%3Cpath d='M-40 50C30 12 95 70 172 39S258 15 337 46S460 60 640 18' stroke-width='13' opacity='.8'/%3E%3Cpath d='M-30 16C80 62 125 7 230 27S390 75 640 45' stroke-width='5' opacity='.5'/%3E%3C/g%3E%3C/svg%3E") center / 100% 100% no-repeat;
+  opacity: .5;
+  animation: set-ink-drift 13s cubic-bezier(.45, 0, .55, 1) infinite alternate;
   animation-delay: var(--ink-phase);
   animation-play-state: paused;
   pointer-events: none;
 }
-.liquid-progress-wave.front {
-  inset-block-start: -1px;
+.liquid-progress-current.front {
   background-color: var(--ink-deep);
-  opacity: .55;
-  animation-duration: 8.4s;
-  animation-direction: reverse;
+  opacity: .35;
+  animation-name: set-ink-undertow;
+  animation-duration: 19s;
 }
-.liquid-progress.flowing .liquid-progress-wave { animation-play-state: running; }
-@keyframes set-ink-flow {
-  to { transform: translateX(-96px); }
+.liquid-progress-fill::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / .12);
+  pointer-events: none;
+}
+.liquid-progress.flowing .liquid-progress-current { animation-play-state: running; }
+@keyframes set-ink-drift {
+  0% { transform: translate(-12%, -9%) scale(1.08, .95); }
+  48% { transform: translate(1%, 12%) scale(1.16, 1.3); }
+  100% { transform: translate(12%, -4%) scale(1.04, 1.08); }
+}
+@keyframes set-ink-undertow {
+  0% { transform: translate(9%, 15%) scale(1.2, 1.4) rotate(3deg); }
+  55% { transform: translate(-3%, -12%) scale(1.06, 1.1) rotate(-2deg); }
+  100% { transform: translate(-11%, 7%) scale(1.15, 1.3) rotate(1deg); }
 }
 @media (prefers-reduced-motion: reduce) {
-  .liquid-progress-wave { animation: none; }
+  .liquid-progress-current { animation: none; }
 }
