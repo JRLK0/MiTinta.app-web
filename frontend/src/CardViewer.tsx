@@ -1,6 +1,6 @@
 import { CSSProperties, PointerEvent, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { Gem, Move3D, Plus, Sparkles, X } from 'lucide-react'
+import { Check, Gem, Move3D, Plus, X } from 'lucide-react'
 import { FoilProfile, foilHasTopLayer, foilMaskUrls, foilProfileFor } from './foilEffect'
 import { deviceTiltFromOrientation } from './cardMotion'
 import { isFoilOnlyRarity } from './catalog'
@@ -82,6 +82,8 @@ export function CardViewer({ card, foil = false, canToggleFoil = false, printing
     : undefined
   const hasSatinOverlay = satinOverlayProfiles.has(foilProfile)
   const owned = ownershipForCard?.(activeCard) ?? { normal: activeCard.normalQuantity ?? 0, foil: activeCard.foilQuantity ?? 0 }
+  const showOwnership = Boolean(ownershipForCard || onAddCopy || activeCard.normalQuantity != null || activeCard.foilQuantity != null)
+  const finishes = isSpecial ? ['FOIL'] as const : canShowFoil || owned.foil > 0 || foil ? ['NORMAL', 'FOIL'] as const : ['NORMAL'] as const
 
   useEffect(() => {
     setActiveCard(card)
@@ -306,7 +308,6 @@ export function CardViewer({ card, foil = false, canToggleFoil = false, printing
               {processedTopMask && <span className="viewer-foil-top"><span className="viewer-foil-inner" style={{ '--top-mask': processedTopMask } as CSSProperties} /></span>}
             </span>}
           </div>
-          {hasFoilEffect && <span className={`viewer-finish-caption ${rarityClass}`}><Sparkles />{isSpecial ? activeCard.rarity : 'Acabado foil'}</span>}
           {hasFoilEffect && motionAccess === 'prompt' && <button className="viewer-motion-hint action" onClick={requestOrientation}><Move3D />Activar movimiento</button>}
           {hasFoilEffect && motionAccess === 'listening' && <span className="viewer-motion-hint"><Move3D />Detectando movimiento…</span>}
           {hasFoilEffect && motionAccess === 'active' && <span className="viewer-motion-hint"><Move3D />Inclina el móvil</span>}
@@ -316,10 +317,26 @@ export function CardViewer({ card, foil = false, canToggleFoil = false, printing
           <p className="eyebrow">{activeCard.setCode ? `${activeCard.setCode} · #${activeCard.collectorNumber}` : 'Lorcana'}</p>
           <h2>{activeCard.name}</h2>
           <p className="viewer-version">{activeCard.version}</p>
-          {(onAddCopy || owned.normal > 0 || owned.foil > 0) && <div className="viewer-ownership" aria-label="Copias en tu colección">
-            <span><small>Normal</small><b>×{owned.normal}</b></span>
-            <span className="foil"><Gem aria-hidden="true" /><small>Foil</small><b>×{owned.foil}</b></span>
-          </div>}
+          <div className="viewer-finish-control">
+            <span className="viewer-finish-label">{showOwnership ? 'Copias en tu colección' : 'Acabado'}</span>
+            <div className="viewer-finish" role="group" aria-label="Acabado de la carta">
+              {finishes.map((finish) => {
+                const isFoil = finish === 'FOIL'
+                const selected = effectiveFoilMode === isFoil
+                const name = isFoil ? 'Foil' : 'Normal'
+                const quantity = isFoil ? owned.foil : owned.normal
+                const content = <>{isFoil && <Gem aria-hidden="true" />}<span>{name}</span>{showOwnership && <b className="viewer-finish-count">×{quantity}</b>}{selected && <Check className="viewer-finish-check" aria-hidden="true" />}</>
+                return finishes.length > 1 ? <button
+                  key={finish}
+                  type="button"
+                  className={selected ? 'active' : ''}
+                  aria-pressed={selected}
+                  aria-label={showOwnership ? `${name}, ${quantity} ${quantity === 1 ? 'copia' : 'copias'} en tu colección` : name}
+                  onClick={() => setFoilMode(isFoil)}
+                >{content}</button> : <span key={finish} className="viewer-finish-only">{content}</span>
+              })}
+            </div>
+          </div>
           {printings.length > 1 && <div className="viewer-printings">
             <span>Impresiones</span>
             <div>{printings.map((printing) => {
@@ -338,10 +355,6 @@ export function CardViewer({ card, foil = false, canToggleFoil = false, printing
               </button>
             })}</div>
             <small>Pasa el ratón o toca una opción para cambiar la imagen.</small>
-          </div>}
-          {canShowFoil && !isSpecial && <div className="viewer-finish segmented" aria-label="Acabado mostrado">
-            <button className={!foilMode ? 'active' : ''} onClick={() => setFoilMode(false)}>Normal</button>
-            <button className={foilMode ? 'active' : ''} onClick={() => setFoilMode(true)}><Gem />Foil</button>
           </div>}
           <div className="viewer-meta">
             {activeCard.rarity && <span>{activeCard.rarity}</span>}
