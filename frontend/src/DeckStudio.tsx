@@ -1,13 +1,16 @@
 import { buildFormatChecker, formatName, replaceDeckPrinting, type DeckFormat } from './deckFormat'
 import './deckFormat.css'
 import { availableDeckCatalog } from './deckCatalog'
+import { deckLibrarySummary } from './deckLibrary'
+import { loadAllPages } from './pagination'
+import './deckLibrary.css'
 import { DeckInkCrest } from './DeckInkCrest'
 import { allowsDeckInk, changeDeckCopies, deckCopyState, deckInkPolicy, validateDeck } from './deckRules'
 import { ThemeToggle } from '../../shared/ThemeToggle'
 import { ChangeEvent, useEffect, useMemo, useRef, useState } from 'react'
 import type { Session } from '@supabase/supabase-js'
 import {
-  BarChart3, BookOpen, CheckCircle2, ChevronDown, CircleAlert, ClipboardPaste, Download, Eye, EyeOff,
+  ArrowLeft, ArrowRight, BarChart3, BookOpen, CheckCircle2, ChevronDown, CircleAlert, ClipboardPaste, Download, Eye, EyeOff,
   FileDown, FileUp, Link2, Minus, Plus, Save, Sparkles, Trash2, X,
 } from 'lucide-react'
 import { cardTitle, loadCatalog, type CatalogCard } from './catalog'
@@ -101,6 +104,11 @@ export function DeckStudio({ session, collection, ownershipForCard, onAddCopy }:
   const [catalogError, setCatalogError] = useState('')
   const [loadingCatalog, setLoadingCatalog] = useState(true)
   const [decks, setDecks] = useState<Deck[]>([])
+  const [screen, setScreen] = useState<'library' | 'format' | 'editor'>('library')
+  const [libraryEntries, setLibraryEntries] = useState<DeckEntry[]>([])
+  const [libraryLoading, setLibraryLoading] = useState(true)
+  const [libraryError, setLibraryError] = useState('')
+  const [openingId, setOpeningId] = useState<string | null>(null)
   const [activeId, setActiveId] = useState<string | null>(restoredDraft?.activeId ?? null)
   const [name, setName] = useState(restoredDraft?.name ?? 'Mazo nuevo')
   const [description, setDescription] = useState(restoredDraft?.description ?? '')
@@ -198,14 +206,26 @@ export function DeckStudio({ session, collection, ownershipForCard, onAddCopy }:
   }
 
   async function loadDecks() {
-    const { data, error } = await supabase.from('decks').select('*').eq('user_id', session.user.id).order('updated_at', { ascending: false })
-    if (error) setMessage(`No se pudieron cargar los mazos: ${error.message}`)
-    else setDecks((data ?? []) as Deck[])
+    setLibraryLoading(true)
+    setLibraryError('')
+    try {
+      const result = await loadAllPages<Deck>(async (from, to) => await supabase.from('decks').select('*').eq('user_id', session.user.id).order('updated_at', { ascending: false }).order('id').range(from, to))
+      if (result.error) throw new Error(result.error.message)
+      const loaded = result.data ?? []
+      setDecks(loaded)
+      const contents = loaded.length ? await loadAllPages<DeckEntry>(async (from, to) => await supabase.from('deck_entries').select('*').in('deck_id', loaded.map(deck => deck.id)).order('deck_id').order('card_id').range(from, to)) : { data: [], error: null }
+      if (contents.error) throw new Error(contents.error.message)
+      setLibraryEntries(contents.data ?? [])
+    } catch (error) {
+      setLibraryError(error instanceof Error ? error.message : 'No se pudieron cargar tus mazos.')
+    } finally { setLibraryLoading(false) }
   }
 
   async function openDeck(deck: Deck) {
     if (!canDiscardDraft()) return
-    const { data, error } = await supabase.from('deck_entries').select('*').eq('deck_id', deck.id)
+    setOpeningId(deck.id)
+    const { data, error } = await loadAllPages<DeckEntry>(async (from, to) => await supabase.from('deck_entries').select('*').eq('deck_id', deck.id).order('card_id').range(from, to))
+    setOpeningId(null)
     if (error) return setMessage(error.message)
     applyEditor({
       activeId: deck.id,
@@ -216,12 +236,21 @@ export function DeckStudio({ session, collection, ownershipForCard, onAddCopy }:
       entries: (data ?? []) as DeckEntry[],
     }, true)
     setMessage('')
+    setScreen(deck.format ? 'editor' : 'format')
+    setMobilePane('catalog')
   }
 
   function newDeck() {
     if (!canDiscardDraft()) return
     applyEditor({ activeId: null, name: 'Mazo nuevo', description: '', isPublic: false, format: null, entries: [] }, true)
     setMessage('')
+    setScreen('format')
+  }
+
+  function chooseFormat(value: DeckFormat) {
+    setFormat(value)
+    setMobilePane('catalog')
+    setScreen('editor')
   }
 
   function changeCard(card: CatalogCard, delta: number) {
@@ -277,6 +306,7 @@ export function DeckStudio({ session, collection, ownershipForCard, onAddCopy }:
     if (error) return setMessage(error.message)
     applyEditor({ activeId: null, name: 'Mazo nuevo', description: '', isPublic: false, format: null, entries: [] }, true)
     setMessage('')
+    setScreen('library')
     await loadDecks()
   }
 
@@ -410,15 +440,29 @@ export function DeckStudio({ session, collection, ownershipForCard, onAddCopy }:
   const ownedInDeck = Math.max(0, rules.total - missing)
   const priceSummary = useMemo(() => buildDeckPriceSummary(collection, entries), [collection, entries])
 
+  if (screen === 'library') return <section className="deck-library-page" aria-label="Mis mazos">
+    <header className="deck-library-header"><div><h1>Mis mazos</h1><p>Elige un mazo para verlo y editarlo.</p></div><button className="save-command" onClick={newDeck}><Plus />Nuevo mazo</button></header>
+    {isDirty && <div className="deck-resume"><div><strong>{name}</strong><span>Tienes un borrador sin guardar.</span></div><button onClick={() => setScreen(format ? 'editor' : 'format')}>Continuar borrador<ArrowRight /></button></div>}
+    {message && <p className="notice" role="status">{message}</p>}
+    {libraryError && <div className="notice error" role="alert">No se pudieron cargar todos los datos: {libraryError}<button onClick={() => void loadDecks()}>Reintentar</button></div>}
+    {libraryLoading ? <p className="deck-library-loading" role="status">Cargando tus mazos…</p> : decks.length ? <div className="deck-library-grid">{decks.map(deck => {
+      const summary = deckLibrarySummary(libraryEntries.filter(entry => entry.deck_id === deck.id))
+      return <button key={deck.id} className="deck-library-card" onClick={() => void openDeck(deck)} disabled={openingId !== null} aria-label={`Abrir y editar ${deck.name}`}>
+        <div className="deck-library-art"><div className="deck-library-previews" aria-hidden="true">{!libraryError && summary.previews.map(entry => <img key={entry.card_id} src={entry.image_url!} alt="" loading="lazy" />)}{!summary.previews.length && <BookOpen />}</div>{!libraryError && <DeckInkCrest inks={summary.inks} baseInks={summary.baseInks} />}</div>
+        <div className="deck-library-copy"><div className="deck-library-meta"><span>{deck.format ? formatName(deck.format) : 'Formato pendiente'}</span><span>{deck.is_public ? <><Eye />Público</> : <><EyeOff />Privado</>}</span></div><h2>{deck.name}</h2>{deck.description && <p>{deck.description}</p>}<div className="deck-library-footer"><span>{libraryError ? 'Resumen no disponible' : `${summary.total} cartas · ${summary.latestSet ? `Hasta el set ${summary.latestSet}` : summary.total ? 'Set especial' : 'Sin cartas'}`}</span><ArrowRight aria-hidden="true" /></div>{openingId === deck.id && <span role="status">Abriendo mazo…</span>}</div>
+      </button>
+    })}</div> : !libraryError && <div className="deck-library-empty"><BookOpen /><h2>Tu primer mazo empieza aquí</h2><p>Elige su formato y añade cartas o importa una lista.</p><button className="save-command" onClick={newDeck}><Plus />Crear mi primer mazo</button></div>}
+  </section>
+
+  if (screen === 'format') return <section className="deck-format-page">
+    <button className="deck-back" onClick={() => setScreen('library')}><ArrowLeft />Mis mazos</button>
+    <div className="deck-format-intro"><h1>{activeId ? 'Elige el formato del mazo' : '¿Qué formato quieres construir?'}</h1><p>El formato determina qué cartas puedes añadir. Podrás cambiarlo en el editor.</p></div>
+    <div className="deck-format-choices"><button onClick={() => chooseFormat('core')}><span>Core</span><p>Construye con las ediciones vigentes y las reimpresiones válidas.</p><strong>Crear en Core<ArrowRight /></strong></button><button onClick={() => chooseFormat('infinity')}><span>Infinity</span><p>Construye con cartas de todos los sets, respetando la lista de prohibidas.</p><strong>Crear en Infinity<ArrowRight /></strong></button></div>
+  </section>
+
   return (
     <section ref={workspace} className="studio-shell deck-workspace">
-      <details className="deck-library"><summary><BookOpen />Tus mazos<ChevronDown /></summary><aside>
-        <div className="panel-heading"><div><span>Biblioteca</span><h2>Tus mazos</h2></div><button className="new-deck-command" onClick={newDeck}><Plus />Nuevo</button></div>
-        <div className="deck-list">
-          {decks.map((deck) => <button key={deck.id} className={activeId === deck.id ? 'active' : ''} onClick={() => void openDeck(deck)}><strong>{deck.name}</strong><span>{deck.format && `${formatName(deck.format)} · `}{deck.is_public ? <><Eye /> Público</> : <><EyeOff /> Privado</>}</span></button>)}
-          {decks.length === 0 && <p className="panel-empty">Aún no has guardado ningún mazo.</p>}
-        </div>
-      </aside></details>
+      <div className="deck-editor-navigation"><button className="deck-back" onClick={() => setScreen('library')}><ArrowLeft />Mis mazos</button><span>{activeId ? 'Editar mazo' : 'Nuevo mazo'}</span></div>
 
       <div className="deck-editor">
         <div className="deck-editor-head">
