@@ -13,9 +13,11 @@ describe('bundled catalog', () => {
     expect(payload.cards.every((card) => card.name && card.set_code && card.collector_number)).toBe(true)
   })
 
-  it('keeps Cardmarket coverage above 95 percent', () => {
-    const priced = payload.cards.filter((card) => card.normal_price_eur != null || card.foil_price_eur != null)
-    expect(priced.length / payload.cards.length).toBeGreaterThan(.95)
+  it('keeps Cardmarket coverage above 95 percent outside the Hyperia City preview', () => {
+    // Set 14 is a prerelease preview with no Cardmarket prices yet (October 2026).
+    const marketCatalog = payload.cards.filter((card) => card.set_code !== '14')
+    const priced = marketCatalog.filter((card) => card.normal_price_eur != null || card.foil_price_eur != null)
+    expect(priced.length / marketCatalog.length).toBeGreaterThan(.95)
   })
 
   it('includes the announced set and year 4 promotional collections', () => {
