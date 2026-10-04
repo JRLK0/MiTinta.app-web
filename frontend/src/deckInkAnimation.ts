@@ -34,13 +34,13 @@ export function animateDeckInkAmbient(canvas: HTMLCanvasElement, host: HTMLEleme
       const start = { x: a.x + (single ? -26 : 0), y: a.y }
       const end = { x: b.x + (single ? 26 : 0), y: b.y }
       const drift = Math.sin(t * .47) * 9 + Math.sin(t * .79 + 1.4) * 5
-      const c1 = { x: start.x + Math.cos(t * .31) * 18, y: start.y + direction * (30 + drift) }
-      const c2 = { x: end.x + Math.sin(t * .39 + .8) * 16, y: end.y - direction * (26 - drift) }
+      const c1 = { x: start.x + Math.cos(t * .31) * 18, y: start.y + direction * (53 + drift) }
+      const c2 = { x: end.x + Math.sin(t * .39 + .8) * 16, y: end.y + direction * (48 - drift) }
       const color = ctx.createLinearGradient(start.x - 1, start.y, end.x + 1, end.y)
       color.addColorStop(0, a.color); color.addColorStop(1, b.color)
       ctx.strokeStyle = color; ctx.lineCap = 'round'
       // Layered pigment creates a soft edge without a per-frame blur filter.
-      for (const [stroke, opacity] of [[24, .025], [16, .045], [8, .085], [2, .18]]) {
+      for (const [stroke, opacity] of [[28, .055], [18, .095], [9, .16], [2.5, .3]]) {
         ctx.globalAlpha = opacity
         ctx.lineWidth = stroke; ctx.beginPath(); ctx.moveTo(start.x, start.y)
         ctx.bezierCurveTo(c1.x, c1.y, c2.x, c2.y, end.x, end.y); ctx.stroke()
@@ -51,15 +51,15 @@ export function animateDeckInkAmbient(canvas: HTMLCanvasElement, host: HTMLEleme
         const u = phase < 1 ? phase : 2 - phase, v = 1 - u
         const x = v ** 3 * start.x + 3 * v * v * u * c1.x + 3 * v * u * u * c2.x + u ** 3 * end.x
         const y = v ** 3 * start.y + 3 * v * v * u * c1.y + 3 * v * u * u * c2.y + u ** 3 * end.y
-        const glow = ctx.createRadialGradient(x, y, 0, x, y, 16)
+        const glow = ctx.createRadialGradient(x, y, 0, x, y, 19)
         glow.addColorStop(0, phase < 1 ? a.color : b.color); glow.addColorStop(1, 'transparent')
-        ctx.globalAlpha = .28 * Math.sin(Math.PI * u)
-        ctx.fillStyle = glow; ctx.fillRect(x - 16, y - 16, 32, 32)
+        ctx.globalAlpha = .48 * Math.sin(Math.PI * u)
+        ctx.fillStyle = glow; ctx.fillRect(x - 19, y - 19, 38, 38)
       }
       const x = a.x + Math.cos(t * .27) * 23, y = a.y + Math.sin(t * .41) * 21
       const haze = ctx.createRadialGradient(x, y, 2, x, y, 38)
       haze.addColorStop(0, a.color); haze.addColorStop(1, 'transparent')
-      ctx.globalAlpha = .13; ctx.fillStyle = haze; ctx.fillRect(x - 38, y - 38, 76, 76)
+      ctx.globalAlpha = .23; ctx.fillStyle = haze; ctx.fillRect(x - 38, y - 38, 76, 76)
     }
     ctx.globalAlpha = 1
     frame = requestAnimationFrame(draw)
