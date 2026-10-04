@@ -13,6 +13,7 @@
 .deck-row .deck-format-notice.invalid small, .picker-card .picker-format-warning { color: var(--danger); }
 .deck-format-notice button { display: block; background: transparent; border: 0; color: var(--accent); padding: 6px 0 0; font-size: 11px; font-weight: 650; text-align: left; min-height: 32px; }
 .deck-import-modal .deck-format-selector { margin-bottom: 14px; }
+.deck-catalog-scope { margin: 0; padding: 8px 15px; color: var(--muted); font-size: 11px; line-height: 1.5; }
 @media (max-width: 600px) {
   .deck-workspace { overflow-x: clip; }
   .deck-editor > .deck-format-selector { padding-inline: 16px; }

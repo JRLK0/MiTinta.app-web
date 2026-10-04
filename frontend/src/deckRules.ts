@@ -37,19 +37,35 @@ export function changeDeckCopies(entries: DeckDraftEntry[], card: DeckDraftEntry
 }
 export function cardInks(ink: string | null) { return ink?.split('/').map(value => value.trim()).filter(Boolean) ?? [] }
 
+type InkCard = CopyIdentity & Pick<DeckDraftEntry, 'ink' | 'card_type'>
+// Register future verified construction exceptions here so validation and the
+// catalog always use the same rule. Never infer permissions from partial names.
+const inkExceptions = [{
+  identity: normalize('Christopher Robin|Hunny Sage'),
+  baseInks: ['Amethyst', 'Sapphire'],
+  permits: (card: InkCard) => /\bCharacter\b/i.test(card.card_type) && hunnyCharacters.has(identity(card)),
+}]
+export function deckInkPolicy(entries: DeckDraftEntry[]) {
+  const active = entries.filter(entry => entry.quantity > 0)
+  const inks = Array.from(new Set(active.flatMap(entry => cardInks(entry.ink))))
+  const exception = inkExceptions.find(rule => active.some(entry => identity(entry) === rule.identity))
+  return { inks, baseInks: exception?.baseInks ?? inks, exception }
+}
+export function allowsDeckInk(policy: ReturnType<typeof deckInkPolicy>, card: InkCard) {
+  const candidateInks = cardInks(card.ink)
+  if (!candidateInks.length) return false
+  if (policy.exception) return policy.exception.permits(card) || candidateInks.every(ink => policy.baseInks.includes(ink))
+  if (policy.inks.length > 2) return candidateInks.every(ink => policy.inks.includes(ink))
+  return new Set([...policy.inks, ...candidateInks]).size <= 2
+}
+
 export function validateDeck(entries: DeckDraftEntry[]) {
   const active = entries.filter(entry => entry.quantity > 0)
   const total = active.reduce((sum, entry) => sum + entry.quantity, 0)
-  const inks = Array.from(new Set(active.flatMap(entry => cardInks(entry.ink))))
-  const hunnyEnabled = active.some(entry => identity(entry) === normalize('Christopher Robin|Hunny Sage'))
-  const baseInks = hunnyEnabled ? ['Amethyst', 'Sapphire'] : inks
-  const invalidInkCards = active.filter(entry => {
-    if (!cardInks(entry.ink).length) return true
-    if (!hunnyEnabled) return inks.length > 2
-    const exempt = identity(entry) !== normalize('Christopher Robin|Hunny Sage') &&
-      /\bCharacter\b/i.test(entry.card_type) && hunnyCharacters.has(identity(entry))
-    return !exempt && cardInks(entry.ink).some(ink => !baseInks.includes(ink))
-  })
+  const policy = deckInkPolicy(active)
+  const { inks, baseInks } = policy
+  const hunnyEnabled = Boolean(policy.exception?.identity === normalize('Christopher Robin|Hunny Sage'))
+  const invalidInkCards = active.filter(entry => (!policy.exception && inks.length > 2) || !allowsDeckInk(policy, entry))
   const copies = new Map<string, { count: number; limit: number; title: string }>()
   for (const entry of active) {
     const key = identity(entry)

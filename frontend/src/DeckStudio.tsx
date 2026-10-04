@@ -1,7 +1,8 @@
 import { buildFormatChecker, formatName, replaceDeckPrinting, type DeckFormat } from './deckFormat'
 import './deckFormat.css'
+import { availableDeckCatalog } from './deckCatalog'
 import { DeckInkCrest } from './DeckInkCrest'
-import { changeDeckCopies, deckCopyState, validateDeck } from './deckRules'
+import { allowsDeckInk, changeDeckCopies, deckCopyState, deckInkPolicy, validateDeck } from './deckRules'
 import { ThemeToggle } from '../../shared/ThemeToggle'
 import { ChangeEvent, useEffect, useMemo, useState } from 'react'
 import type { Session } from '@supabase/supabase-js'
@@ -12,7 +13,7 @@ import {
 import { cardTitle, loadCatalog, type CatalogCard } from './catalog'
 import { CardFilterBar, COMMON_SORT_OPTIONS } from './CardFilterBar'
 import { CardViewer, type AddCopy, type OwnershipForCard, type ViewerCard } from './CardViewer'
-import { EMPTY_CARD_FILTERS, filterCards, sortCards, type CardFilterState, type CommonSortMode, type FilterableCard } from './cardFilters'
+import { EMPTY_CARD_FILTERS, INK_OPTIONS, filterCards, sortCards, type CardFilterState, type CommonSortMode, type FilterableCard } from './cardFilters'
 import { parseDeck } from './deckImport'
 import { analyzeDeck, type DeckAnalyticsEntry } from './deckAnalytics'
 import { buildCardmarketMissingText, buildDeckAvailability, buildDeckPriceSummary, deckAvailabilityKey } from './deckAvailability'
@@ -207,6 +208,7 @@ export function DeckStudio({ session, collection, ownershipForCard, onAddCopy }:
 
   function changeCard(card: CatalogCard, delta: number) {
     if (!format) return setMessage('Elige Core o Infinity antes de añadir cartas.')
+    if (delta > 0 && !allowsDeckInk(deckInkPolicy(entries), entryFromCard(card))) return setMessage('Esta carta no encaja con las tintas del mazo.')
     const legality = checkFormat(entryFromCard(card))
     if (!legality.legal) setMessage(legality.message)
     setEntries(current => changeDeckCopies(current, entryFromCard(card), delta))
@@ -371,18 +373,21 @@ export function DeckStudio({ session, collection, ownershipForCard, onAddCopy }:
   }
 
   const availability = useMemo(() => buildDeckAvailability(collection, entries), [collection, entries])
-  const filterableCatalog = useMemo(() => catalog.map(deckFilterCard), [catalog])
+  const eligibleCatalog = useMemo(() => availableDeckCatalog(catalog, entries, format), [catalog, entries, format])
+  const filterableCatalog = useMemo(() => eligibleCatalog.map(deckFilterCard), [eligibleCatalog])
   const catalogById = useMemo(() => new Map(catalog.map((card) => [card.id, card])), [catalog])
-  const visibleCatalog = useMemo(() => {
+  const matchingCatalog = useMemo(() => {
     return sortCards(filterCards(filterableCatalog, filters).filter((card) => !onlyAvailable || (availability.get(deckAvailabilityKey(card.name, card.version))?.remaining ?? 0) > 0), sort)
       .map((card) => catalogById.get(card.id))
       .filter((card): card is CatalogCard => card != null)
-      .slice(0, 120)
   }, [availability, catalogById, filterableCatalog, filters, onlyAvailable, sort])
+  const visibleCatalog = matchingCatalog.slice(0, 120)
   const checkFormat = useMemo(() => buildFormatChecker(catalog, format ?? 'core'), [catalog, format])
   const formatIssues = useMemo(() => format && !loadingCatalog && !catalogError ? entries.filter(entry => !checkFormat(entry).legal) : [], [entries, checkFormat, format, loadingCatalog, catalogError])
   const formatReady = !!format && !loadingCatalog && !catalogError
   const rules = useMemo(() => validateDeck(entries), [entries])
+  const inkNames = rules.baseInks.map(ink => INK_OPTIONS.find(option => option.value === ink.toUpperCase())?.label ?? ink).join(' + ')
+  const catalogScope = [format === 'core' ? 'Core · ediciones vigentes' : format === 'infinity' ? 'Infinity · cartas válidas' : '', rules.hunnyEnabled ? `${inkNames} + otros personajes Hunny` : rules.inks.length >= 2 ? `Solo ${inkNames}` : ''].filter(Boolean).join(' · ')
   const missing = Array.from(availability.values()).reduce((sum, card) => sum + card.missing, 0)
   const ownedInDeck = Math.max(0, rules.total - missing)
   const priceSummary = useMemo(() => buildDeckPriceSummary(collection, entries), [collection, entries])
@@ -456,8 +461,9 @@ export function DeckStudio({ session, collection, ownershipForCard, onAddCopy }:
 
           <div className="catalog-picker">
             <div className="catalog-picker-heading"><div><span>Explorar</span><h3>Añadir cartas</h3></div><p><i className="legend-owned" />En tu colección <i className="legend-missing" />No disponible</p></div>
-            <CardFilterBar compact cards={filterableCatalog} filters={filters} onFiltersChange={setFilters} sort={sort} sortOptions={COMMON_SORT_OPTIONS} onSortChange={(value) => setSort(value as CommonSortMode)} resultCount={visibleCatalog.length} totalCount={catalog.length} extraActiveCount={onlyAvailable ? 1 : 0} extraActiveLabel="Solo disponibles" onReset={() => setOnlyAvailable(false)} specificControls={<div className="specific-filter-control"><span>Colección propia</span><div><button className={!onlyAvailable ? 'active' : ''} onClick={() => setOnlyAvailable(false)}>Todas</button><button className={onlyAvailable ? 'active' : ''} onClick={() => setOnlyAvailable(true)}>Solo disponibles</button></div></div>} />
-            {catalogError && <p className="notice error">{catalogError}</p>}
+            {catalogScope && <p className="deck-catalog-scope">{catalogScope}</p>}
+            <CardFilterBar compact cards={filterableCatalog} filters={filters} onFiltersChange={setFilters} sort={sort} sortOptions={COMMON_SORT_OPTIONS} onSortChange={(value) => setSort(value as CommonSortMode)} resultCount={matchingCatalog.length} totalCount={eligibleCatalog.length} extraActiveCount={onlyAvailable ? 1 : 0} extraActiveLabel="Solo disponibles" onReset={() => setOnlyAvailable(false)} specificControls={<div className="specific-filter-control"><span>Colección propia</span><div><button className={!onlyAvailable ? 'active' : ''} onClick={() => setOnlyAvailable(false)}>Todas</button><button className={onlyAvailable ? 'active' : ''} onClick={() => setOnlyAvailable(true)}>Solo disponibles</button></div></div>} />
+            {matchingCatalog.length > 120 && <p className="deck-catalog-scope">Mostrando las primeras 120 cartas. Afina la búsqueda para ver el resto.</p>}{!loadingCatalog && !catalogError && matchingCatalog.length === 0 && <p className="picker-loading">No hay cartas compatibles con el formato, las tintas y los filtros elegidos.</p>}{catalogError && <p className="notice error">{catalogError}</p>}
             {loadingCatalog ? <p className="picker-loading">Descargando catálogo…</p> : <div className="picker-grid">{visibleCatalog.map((card) => {
               const cardAvailability = availability.get(deckAvailabilityKey(card.name, card.version)) ?? { owned: 0, required: 0, remaining: 0, missing: 0 }
               const copyState = deckCopyState(entries, entryFromCard(card))

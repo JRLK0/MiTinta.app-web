@@ -41,6 +41,21 @@ desactiva el fondo y puede cambiarse durante la sesión.
 
 ## Formato Core / Infinity
 
+El catálogo para añadir se ajusta automáticamente al formato y las tintas del
+mazo. Core ofrece ediciones vigentes y oculta las antiguas (aunque su identidad
+sea legal por reimpresión); Infinity conserva las ediciones legales de todos los
+sets. Ambos excluyen cartas no confirmadas, prohibidas o sin lanzar. Estas
+restricciones no ocultan ni eliminan filas de la lista importada o guardada.
+Con dos tintas solo se ofrecen cartas de esas tintas, incluidas dobles compatibles.
+Con una tinta se evita que una carta doble introduzca una tercera. Al eliminar
+la última copia de una tinta se amplían las opciones automáticamente.
+
+El registro `inkExceptions` comparte las excepciones verificadas entre validador
+y selector. Christopher Robin — Hunny Sage mantiene la base Amatista/Zafiro y
+permite otros personajes Hunny verificados. Las cartas futuras que cambien la
+construcción deberán incorporarse al registro cuando sus reglas se confirmen;
+no se conceden excepciones por coincidencias parciales de texto.
+
 El constructor y el importador exigen elegir un formato; los mazos anteriores
 conservan formato nulo hasta que su propietario lo indique. El formato se guarda
 en `decks.format` y en el borrador local; los enlaces públicos lo muestran mediante
