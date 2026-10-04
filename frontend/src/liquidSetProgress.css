@@ -35,57 +35,44 @@
   border-radius: inherit;
   background: linear-gradient(180deg, var(--ink-body), var(--ink-deep));
 }
-/* The tilted orbital planes extend 5px beyond the 7px track.
-   A phase-shifted light passes behind, then in front of the bar. */
-.liquid-progress-orbit {
+/* Clip horizontally to the actual fill; allow 4px of vertical overshoot.
+   Each band travels across the completed portion without moving its endpoint. */
+.liquid-progress-stream {
   position: absolute;
-  top: 50%;
-  width: 20px;
-  height: 20px;
-  transform: translate(-50%, -50%) rotate(-24deg) scaleX(.64);
+  inset: -4px 0;
+  overflow: hidden;
   pointer-events: none;
-  animation: set-orbit-precession 9.6s ease-in-out infinite;
-  animation-delay: calc(var(--ink-phase) + var(--orbit-offset));
-  animation-play-state: paused;
 }
-.liquid-progress-orbit svg {
+.liquid-progress-current {
   position: absolute;
   inset: 0;
+  animation: set-progress-flow 4.2s linear infinite;
+  animation-delay: calc(var(--ink-phase) + var(--orbit-offset));
+  animation-play-state: paused;
+}
+.liquid-progress-current svg {
   display: block;
-  width: 100%;
-  height: 100%;
+  width: 14px;
+  height: 15px;
   overflow: visible;
 }
-.liquid-progress-orbit path {
+.liquid-progress-current path {
   fill: none;
   stroke: var(--ink-light);
-  stroke-width: 1px;
-}
-.orbit-back { opacity: .3; }
-.orbit-front { opacity: .85; }
-.liquid-progress-orbit-trail {
-  fill: none;
-  stroke: var(--ink-body);
-  stroke-width: 1.6px;
-  stroke-dasharray: 12 38.27;
+  stroke-width: 1.2px;
   stroke-linecap: round;
-  transform-origin: 10px 10px;
-  animation: set-orbit-trail 4.8s linear infinite;
-  animation-delay: calc(var(--ink-phase) + var(--orbit-offset));
-  animation-play-state: paused;
 }
-.liquid-progress-orbit-light {
+.orbit-back { opacity: .4; }
+.orbit-front { opacity: .95; }
+.liquid-progress-current::after {
+  content: '';
   position: absolute;
-  top: 50%;
-  left: 50%;
-  width: 3.5px;
-  height: 3.5px;
-  border-radius: 50%;
-  background: var(--ink-light);
-  box-shadow: 0 1px 3px rgb(255 255 255 / .25);
-  animation: set-ink-orbit 4.8s linear infinite;
-  animation-delay: calc(var(--ink-phase) + var(--orbit-offset));
-  animation-play-state: paused;
+  top: 4px;
+  left: 3px;
+  width: 7px;
+  height: 7px;
+  background: linear-gradient(90deg, transparent, var(--ink-light), transparent);
+  opacity: .5;
 }
 .liquid-progress-fill::after {
   content: '';
@@ -95,25 +82,12 @@
   box-shadow: inset 0 1px 0 rgb(255 255 255 / .12);
   pointer-events: none;
 }
-.liquid-progress.flowing .liquid-progress-orbit,
-.liquid-progress.flowing .liquid-progress-orbit-trail,
-.liquid-progress.flowing .liquid-progress-orbit-light { animation-play-state: running; }
-@keyframes set-orbit-precession {
-  0%, 100% { transform: translate(-50%, -50%) rotate(-24deg) scaleX(.64); }
-  50% { transform: translate(-50%, -50%) rotate(-10deg) scaleX(.48); }
-}
-@keyframes set-orbit-trail {
-  from { transform: rotate(-175deg); }
-  to { transform: rotate(185deg); }
-}
-@keyframes set-ink-orbit {
-  0% { transform: translate(-50%, -50%) rotate(0deg) translateY(-8px); opacity: .65; }
-  25% { transform: translate(-50%, -50%) rotate(90deg) translateY(-8px); opacity: 1; }
-  50% { transform: translate(-50%, -50%) rotate(180deg) translateY(-8px); opacity: .65; }
-  75% { transform: translate(-50%, -50%) rotate(270deg) translateY(-8px); opacity: .16; }
-  100% { transform: translate(-50%, -50%) rotate(360deg) translateY(-8px); opacity: .65; }
+.liquid-progress.flowing .liquid-progress-current { animation-play-state: running; }
+@keyframes set-progress-flow {
+  from { transform: translateX(-14px); }
+  to { transform: translateX(100%); }
 }
 @media (prefers-reduced-motion: reduce) {
-  .liquid-progress-orbit-light, .liquid-progress-orbit-trail { animation: none; display: none; }
-  .liquid-progress-orbit { animation: none; opacity: .5; }
+  .liquid-progress-stream { display: none; }
+  .liquid-progress-current { animation: none; }
 }
