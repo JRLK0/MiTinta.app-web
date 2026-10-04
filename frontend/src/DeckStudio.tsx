@@ -1,3 +1,5 @@
+import { buildFormatChecker, formatName, replaceDeckPrinting, type DeckFormat } from './deckFormat'
+import './deckFormat.css'
 import { DeckInkCrest } from './DeckInkCrest'
 import { changeDeckCopies, deckCopyState, validateDeck } from './deckRules'
 import { ThemeToggle } from '../../shared/ThemeToggle'
@@ -34,6 +36,7 @@ type Deck = {
   description: string
   is_public: boolean
   updated_at: string
+  format: DeckFormat | null
 }
 
 type DeckEntry = DeckDraftEntry
@@ -53,6 +56,10 @@ function entryFromCard(card: CatalogCard, quantity = 1): DeckEntry {
     normal_price_eur: card.normal_price_eur,
     foil_price_eur: card.foil_price_eur,
   }
+}
+
+function FormatSelector({ value, onChange }: { value: DeckFormat | null; onChange: (value: DeckFormat) => void }) {
+  return <div className="deck-format-selector" role="group" aria-label="Formato del mazo"><span>Construir para</span><div>{(['core', 'infinity'] as const).map(option => <button key={option} aria-pressed={value === option} className={value === option ? 'active' : ''} onClick={() => onChange(option)}>{formatName(option)}</button>)}</div><small>{value === 'core' ? 'Sets vigentes y reimpresiones válidas' : value === 'infinity' ? 'Todos los sets · con lista de prohibidas' : 'Elige un formato para empezar'}</small></div>
 }
 
 function normalize(value: string) {
@@ -95,9 +102,11 @@ export function DeckStudio({ session, collection, ownershipForCard, onAddCopy }:
   const [activeId, setActiveId] = useState<string | null>(restoredDraft?.activeId ?? null)
   const [name, setName] = useState(restoredDraft?.name ?? 'Mazo nuevo')
   const [description, setDescription] = useState(restoredDraft?.description ?? '')
+  const [format, setFormat] = useState<DeckFormat | null>(restoredDraft?.format ?? null)
+  const [importFormat, setImportFormat] = useState<DeckFormat | null>(null)
   const [isPublic, setIsPublic] = useState(restoredDraft?.isPublic ?? false)
   const [entries, setEntries] = useState<DeckEntry[]>(restoredDraft?.entries ?? [])
-  const [baseline, setBaseline] = useState(() => restoredDraft ? '' : deckEditorFingerprint({ activeId: null, name: 'Mazo nuevo', description: '', isPublic: false, entries: [] }))
+  const [baseline, setBaseline] = useState(() => restoredDraft ? '' : deckEditorFingerprint({ activeId: null, name: 'Mazo nuevo', description: '', isPublic: false, format: null, entries: [] }))
   const [filters, setFilters] = useState<CardFilterState>({ ...EMPTY_CARD_FILTERS })
   const [sort, setSort] = useState<CommonSortMode>('set')
   const [onlyAvailable, setOnlyAvailable] = useState(false)
@@ -111,8 +120,8 @@ export function DeckStudio({ session, collection, ownershipForCard, onAddCopy }:
   const [selectedCard, setSelectedCard] = useState<ViewerCard | null>(null)
 
   const editorState = useMemo<DeckEditorState>(
-    () => ({ activeId, name, description, isPublic, entries }),
-    [activeId, name, description, isPublic, entries],
+    () => ({ activeId, name, description, isPublic, format, entries }),
+    [activeId, name, description, isPublic, format, entries],
   )
   const editorFingerprint = useMemo(() => deckEditorFingerprint(editorState), [editorState])
   const isDirty = editorFingerprint !== baseline
@@ -157,6 +166,7 @@ export function DeckStudio({ session, collection, ownershipForCard, onAddCopy }:
     setName(next.name)
     setDescription(next.description)
     setIsPublic(next.isPublic)
+    setFormat(next.format ?? null)
     setEntries(next.entries)
     if (saved) {
       setBaseline(deckEditorFingerprint(next))
@@ -183,6 +193,7 @@ export function DeckStudio({ session, collection, ownershipForCard, onAddCopy }:
       name: deck.name,
       description: deck.description,
       isPublic: deck.is_public,
+      format: deck.format ?? null,
       entries: (data ?? []) as DeckEntry[],
     }, true)
     setMessage('')
@@ -190,11 +201,14 @@ export function DeckStudio({ session, collection, ownershipForCard, onAddCopy }:
 
   function newDeck() {
     if (!canDiscardDraft()) return
-    applyEditor({ activeId: null, name: 'Mazo nuevo', description: '', isPublic: false, entries: [] }, true)
+    applyEditor({ activeId: null, name: 'Mazo nuevo', description: '', isPublic: false, format: null, entries: [] }, true)
     setMessage('')
   }
 
   function changeCard(card: CatalogCard, delta: number) {
+    if (!format) return setMessage('Elige Core o Infinity antes de añadir cartas.')
+    const legality = checkFormat(entryFromCard(card))
+    if (!legality.legal) setMessage(legality.message)
     setEntries(current => changeDeckCopies(current, entryFromCard(card), delta))
   }
 
@@ -206,11 +220,12 @@ export function DeckStudio({ session, collection, ownershipForCard, onAddCopy }:
   }
 
   async function saveDeck() {
+    if (!format) return setMessage('Elige Core o Infinity antes de guardar.')
     if (!name.trim()) return setMessage('Ponle un nombre al mazo.')
     if (validateDeck(entries).tooMany > 0) return setMessage('Reduce las copias que exceden el límite antes de guardar el mazo.')
     setSaving(true)
     setMessage('')
-    const deckPayload = { user_id: session.user.id, name: name.trim(), description: description.trim(), is_public: isPublic }
+    const deckPayload = { user_id: session.user.id, name: name.trim(), description: description.trim(), is_public: isPublic, format }
     const currentActiveId = activeId
     const result = currentActiveId
       ? await supabase.from('decks').update(deckPayload).eq('id', activeId).select().single()
@@ -232,7 +247,7 @@ export function DeckStudio({ session, collection, ownershipForCard, onAddCopy }:
     }
     const savedState = { ...editorState, activeId: deck.id, name: deck.name, description: deck.description, isPublic: deck.is_public }
     applyEditor(savedState, true)
-    setMessage('Mazo guardado.')
+    setMessage(formatIssues.length ? `Borrador guardado · ${formatIssues.length} cartas pendientes para ${formatName(format)}.` : 'Mazo guardado.')
     await loadDecks()
   }
 
@@ -240,7 +255,7 @@ export function DeckStudio({ session, collection, ownershipForCard, onAddCopy }:
     if (!activeId || !window.confirm('¿Eliminar este mazo?')) return
     const { error } = await supabase.from('decks').delete().eq('id', activeId)
     if (error) return setMessage(error.message)
-    applyEditor({ activeId: null, name: 'Mazo nuevo', description: '', isPublic: false, entries: [] }, true)
+    applyEditor({ activeId: null, name: 'Mazo nuevo', description: '', isPublic: false, format: null, entries: [] }, true)
     setMessage('')
     await loadDecks()
   }
@@ -257,8 +272,7 @@ export function DeckStudio({ session, collection, ownershipForCard, onAddCopy }:
     const file = event.target.files?.[0]
     if (!file) return
     try {
-      importDeck(await file.text())
-      setName(file.name.replace(/\.[^.]+$/, '') || 'Mazo importado')
+      if (importDeck(await file.text())) setName(file.name.replace(/\.[^.]+$/, '') || 'Mazo importado')
     } catch (error) {
       setImportError(error instanceof Error ? error.message : 'No se pudo importar el mazo.')
     }
@@ -280,6 +294,7 @@ export function DeckStudio({ session, collection, ownershipForCard, onAddCopy }:
   }
 
   function openImporter() {
+    setImportFormat(format)
     setImportError('')
     setImportOpen(true)
   }
@@ -294,6 +309,8 @@ export function DeckStudio({ session, collection, ownershipForCard, onAddCopy }:
   }
 
   function importDeck(content: string) {
+    if (!importFormat) { setImportError('Elige Core o Infinity para el mazo importado.'); return false }
+    if (loadingCatalog || catalogError) { setImportError('Espera a que el catálogo esté disponible antes de importar.'); return false }
     const requirements = parseDeck(content)
     const byPrinting = new Map(catalog.map((card) => [`${normalize(card.set_code)}:${normalize(card.collector_number)}`, card]))
     const cardsByTitle = new Map<string, CatalogCard[]>()
@@ -302,22 +319,33 @@ export function DeckStudio({ session, collection, ownershipForCard, onAddCopy }:
       cardsByTitle.set(key, [...(cardsByTitle.get(key) ?? []), card])
     })
     const byTitle = new Map(Array.from(cardsByTitle, ([key, cards]) => [key, preferredDeckPrinting(cards)]))
-    const imported = requirements.flatMap((requirement) => {
+    const resolved = requirements.flatMap((requirement) => {
       const card = requirement.setCode && requirement.collectorNumber
         ? byPrinting.get(`${normalize(requirement.setCode)}:${normalize(requirement.collectorNumber)}`)
         : byTitle.get(normalize(requirement.name))
       return card ? [entryFromCard(card, requirement.count)] : []
     })
+    const imported: DeckEntry[] = []
+    for (const entry of resolved) {
+      const existing = imported.find(candidate => candidate.card_id === entry.card_id)
+      if (existing) existing.quantity += entry.quantity
+      else imported.push(entry)
+    }
     const copyIssues = validateDeck(imported)
     if (copyIssues.tooMany > 0) {
       setImportError(`No se ha importado el mazo. ${copyIssues.issues.filter(issue => issue.includes('copias; máximo')).join(' ')}`)
-      return
+      return false
     }
+    setFormat(importFormat)
     setEntries(imported)
-    setMessage(`${imported.length} cartas distintas importadas; ${requirements.length - imported.length} sin identificar.`)
+    const importedCheck = buildFormatChecker(catalog, importFormat)
+    const invalid = imported.filter(entry => !importedCheck(entry).legal).length
+    const reprints = imported.filter(entry => importedCheck(entry).kind === 'reprint').length
+    setMessage(`${imported.length} cartas distintas importadas para ${formatName(importFormat)}; ${requirements.length - resolved.length} sin identificar.${invalid ? ` ${invalid} fuera del formato: revisa los avisos de la lista.` : ''}${reprints ? ` ${reprints} con reimpresión válida: puedes cambiar su edición en la lista.` : ''}`)
     setImportText('')
     setImportError('')
     setImportOpen(false)
+    return true
   }
 
   function downloadDeck() {
@@ -351,6 +379,9 @@ export function DeckStudio({ session, collection, ownershipForCard, onAddCopy }:
       .filter((card): card is CatalogCard => card != null)
       .slice(0, 120)
   }, [availability, catalogById, filterableCatalog, filters, onlyAvailable, sort])
+  const checkFormat = useMemo(() => buildFormatChecker(catalog, format ?? 'core'), [catalog, format])
+  const formatIssues = useMemo(() => format && !loadingCatalog && !catalogError ? entries.filter(entry => !checkFormat(entry).legal) : [], [entries, checkFormat, format, loadingCatalog, catalogError])
+  const formatReady = !!format && !loadingCatalog && !catalogError
   const rules = useMemo(() => validateDeck(entries), [entries])
   const missing = Array.from(availability.values()).reduce((sum, card) => sum + card.missing, 0)
   const ownedInDeck = Math.max(0, rules.total - missing)
@@ -361,7 +392,7 @@ export function DeckStudio({ session, collection, ownershipForCard, onAddCopy }:
       <aside className="deck-library">
         <div className="panel-heading"><div><span>Biblioteca</span><h2>Tus mazos</h2></div><button className="new-deck-command" onClick={newDeck}><Plus />Nuevo</button></div>
         <div className="deck-list">
-          {decks.map((deck) => <button key={deck.id} className={activeId === deck.id ? 'active' : ''} onClick={() => void openDeck(deck)}><strong>{deck.name}</strong><span>{deck.is_public ? <><Eye /> Público</> : <><EyeOff /> Privado</>}</span></button>)}
+          {decks.map((deck) => <button key={deck.id} className={activeId === deck.id ? 'active' : ''} onClick={() => void openDeck(deck)}><strong>{deck.name}</strong><span>{deck.format && `${formatName(deck.format)} · `}{deck.is_public ? <><Eye /> Público</> : <><EyeOff /> Privado</>}</span></button>)}
           {decks.length === 0 && <p className="panel-empty">Aún no has guardado ningún mazo.</p>}
         </div>
       </aside>
@@ -378,6 +409,7 @@ export function DeckStudio({ session, collection, ownershipForCard, onAddCopy }:
             <button className="save-command" onClick={() => void saveDeck()} disabled={saving}><Save />{saving ? 'Guardando' : 'Guardar'}</button>
           </div>
         </div>
+        <FormatSelector value={format} onChange={setFormat} />
         {message && <p className="studio-message">{message}<button onClick={() => setMessage('')} aria-label="Cerrar mensaje"><X /></button></p>}
         <div className="deck-overview" aria-label="Estado del mazo">
           <div className="deck-progress-card"><span>Construcción</span><strong>{rules.total}<small>/60</small></strong><div className="deck-progress-track"><i style={{ width: `${Math.min(100, (rules.total / 60) * 100)}%` }} /></div></div>
@@ -388,6 +420,7 @@ export function DeckStudio({ session, collection, ownershipForCard, onAddCopy }:
             {missing > 0 && <button className="cardmarket-export" onClick={downloadCardmarketMissing}><FileDown />Exportar a Cardmarket</button>}
           </div>
           <div className="deck-rule-summary">
+            <span className={formatReady && !formatIssues.length ? 'ok' : 'bad'}>{formatReady && !formatIssues.length ? <CheckCircle2 /> : <CircleAlert />}{!format ? 'Elige formato' : !formatReady ? 'Comprobando formato' : formatIssues.length ? `${formatIssues.length} fuera de ${formatName(format)}` : `Cartas válidas en ${formatName(format)}`}</span>
             <span className={rules.inksValid ? 'ok' : 'bad'}><b>{rules.inks.length}{rules.hunnyEnabled ? '' : '/2'}</b> tintas{rules.hunnyEnabled ? ' · Hunny' : ''}</span>
             <span className={rules.tooMany === 0 ? 'ok' : 'bad'}>{rules.tooMany === 0 ? <CheckCircle2 /> : <CircleAlert />}{rules.tooMany === 0 ? 'Copias válidas' : `${rules.tooMany} excesos`}</span>
             <div className="deck-value-summary">
@@ -402,16 +435,17 @@ export function DeckStudio({ session, collection, ownershipForCard, onAddCopy }:
         <div className="deck-canvas">
           <div className="deck-stack">
             <div className="section-title"><div><h3>Tu lista</h3><span>{entries.length} cartas distintas</span></div><DeckInkCrest inks={rules.inks} baseInks={rules.baseInks} invalid={!rules.inksValid} /></div>
-            <div className={`deck-construction-status${rules.valid ? '' : ' bad'}`} aria-live="polite"><p>{rules.valid ? 'Construcción válida · 60 cartas o más' : rules.issues.join(' ')}</p>{rules.hunnyEnabled && <p>Christopher Robin: base Amatista/Zafiro; otras tintas solo en personajes Hunny.</p>}</div>
+            <div className={`deck-construction-status${rules.valid && formatReady && !formatIssues.length ? '' : ' bad'}`} aria-live="polite"><p>{rules.valid && formatReady && !formatIssues.length ? `Mazo válido para ${formatName(format!)} · 60 cartas o más` : [!format ? 'Elige Core o Infinity.' : '', ...rules.issues, ...(formatIssues.length ? [`${formatIssues.length} ${formatIssues.length === 1 ? 'carta fuera' : 'cartas fuera'} de ${formatName(format!)}. Revisa los avisos de la lista.`] : [])].filter(Boolean).join(' ')}</p>{rules.hunnyEnabled && <p>Christopher Robin: base Amatista/Zafiro; otras tintas solo en personajes Hunny.</p>}</div>
             <div className="deck-card-rows">
               {[...entries].sort((a, b) => (a.cost ?? 99) - (b.cost ?? 99) || a.card_name.localeCompare(b.card_name)).map((entry) => {
                 const availabilityKey = deckAvailabilityKey(entry.card_name, entry.card_version)
                 const cardAvailability = availability.get(availabilityKey) ?? { owned: 0, required: entry.quantity, remaining: 0, missing: entry.quantity }
                 const missingPrice = priceSummary.missingPrices.get(availabilityKey)
                 const copyState = deckCopyState(entries, entry)
+                const legality = formatReady ? checkFormat(entry) : null
                 return <article key={entry.card_id} className={`deck-row${cardAvailability.missing > 0 ? ' is-missing' : ' is-owned'}`}>
                   <button className="deck-preview" onClick={() => { const source = catalog.find((card) => card.id === entry.card_id); setSelectedCard({ id: entry.card_id, name: entry.card_name, version: entry.card_version, imageUrl: entry.image_url, setCode: entry.set_code, setName: source?.set_name, collectorNumber: entry.collector_number, rarity: source?.rarity, ink: entry.ink, normalPriceEur: entry.normal_price_eur, foilPriceEur: entry.foil_price_eur }) }} aria-label={`Ver ${entry.card_name}, ${entry.card_version}`}>{entry.image_url ? <img src={entry.image_url} alt="" /> : <span className="deck-thumb"><Sparkles /></span>}</button>
-                  <div><strong>{entry.card_name}</strong><span>{entry.card_version || `${entry.set_code} #${entry.collector_number}`}</span>{copyState.count !== entry.quantity && <small className="deck-shared-copy-limit">{copyState.count}/{Number.isFinite(copyState.limit) ? copyState.limit : '∞'} copias entre todas las ediciones</small>}<small className={cardAvailability.missing === 0 ? 'owned' : 'missing'}>{cardAvailability.missing === 0 ? <><CheckCircle2 />Completa · tienes {cardAvailability.owned}</> : <><CircleAlert />Faltan {cardAvailability.missing} · tienes {cardAvailability.owned} de {cardAvailability.required}</>}</small>{cardAvailability.missing > 0 && <span className="deck-row-price">{missingPrice?.unitPrice == null ? 'Precio aproximado no disponible' : `≈ ${euro(missingPrice.unitPrice)} por carta · ${euro(missingPrice.totalPrice ?? 0)} pendientes`}</span>}</div>
+                  <div><strong>{entry.card_name}</strong><span>{entry.card_version}</span><span className="deck-edition">Set {entry.set_code} · #{entry.collector_number}</span>{legality && legality.kind !== 'legal' && <div className={`deck-format-notice${legality.legal ? ' reprint' : ' invalid'}`}><small>{legality.message}</small>{legality.replacement && <button onClick={() => { const replacement = legality.replacement!; setEntries(current => replaceDeckPrinting(current, entry.card_id, entryFromCard(replacement))); setMessage(`Edición cambiada a ${replacement.set_name}. Se conservan todas las copias.`) }}>Usar {legality.replacement.set_name} · #{legality.replacement.collector_number}</button>}</div>}{copyState.count !== entry.quantity && <small className="deck-shared-copy-limit">{copyState.count}/{Number.isFinite(copyState.limit) ? copyState.limit : '∞'} copias entre todas las ediciones</small>}<small className={cardAvailability.missing === 0 ? 'owned' : 'missing'}>{cardAvailability.missing === 0 ? <><CheckCircle2 />Completa · tienes {cardAvailability.owned}</> : <><CircleAlert />Faltan {cardAvailability.missing} · tienes {cardAvailability.owned} de {cardAvailability.required}</>}</small>{cardAvailability.missing > 0 && <span className="deck-row-price">{missingPrice?.unitPrice == null ? 'Precio aproximado no disponible' : `≈ ${euro(missingPrice.unitPrice)} por carta · ${euro(missingPrice.totalPrice ?? 0)} pendientes`}</span>}</div>
                   <b className="cost-pip">{entry.cost ?? '-'}</b>
                   <div className="mini-stepper"><button onClick={() => changeEntry(entry.card_id, -1)} aria-label={`Quitar una copia de ${entry.card_name}`}><Minus /></button><output title={`${copyState.count} copias entre todas las ediciones`}>{entry.quantity}<small>/{Number.isFinite(copyState.limit) ? copyState.limit : '∞'}</small></output><button disabled={!copyState.canAdd} title={copyState.canAdd ? 'Añadir copia' : `Máximo ${copyState.limit} copias entre todas las ediciones`} onClick={() => changeEntry(entry.card_id, 1)} aria-label={`Añadir una copia de ${entry.card_name}`}><Plus /></button></div>
                 </article>
@@ -427,13 +461,14 @@ export function DeckStudio({ session, collection, ownershipForCard, onAddCopy }:
             {loadingCatalog ? <p className="picker-loading">Descargando catálogo…</p> : <div className="picker-grid">{visibleCatalog.map((card) => {
               const cardAvailability = availability.get(deckAvailabilityKey(card.name, card.version)) ?? { owned: 0, required: 0, remaining: 0, missing: 0 }
               const copyState = deckCopyState(entries, entryFromCard(card))
+              const legality = formatReady ? checkFormat(entryFromCard(card)) : null
               const ownership = cardAvailability.remaining > 0 ? 'available' : cardAvailability.owned > 0 ? 'used' : 'unowned'
-              return <article key={card.id} className={`picker-card ownership-${ownership}`}><div className={`ownership-badge ${ownership}`}>{ownership === 'available' ? <><CheckCircle2 />Tienes {cardAvailability.remaining} disponible{cardAvailability.remaining === 1 ? '' : 's'}</> : ownership === 'used' ? 'Copias ya usadas' : 'No la tienes'}</div><button className="picker-preview" onClick={() => setSelectedCard({ id: card.id, name: card.name, version: card.version, imageUrl: card.image_url, setCode: card.set_code, setName: card.set_name, collectorNumber: card.collector_number, rarity: card.rarity, ink: card.ink, normalPriceEur: card.normal_price_eur, foilPriceEur: card.foil_price_eur })} aria-label={`Ver ${cardTitle(card)}`}>{card.image_url ? <img src={card.image_url} alt={cardTitle(card)} loading="lazy" /> : <span className="deck-thumb"><Sparkles /></span>}</button><button disabled={!copyState.canAdd} onClick={() => changeCard(card, 1)} title={copyState.canAdd ? `Añadir ${cardTitle(card)}` : `Máximo ${copyState.limit} copias entre todas las ediciones`} aria-label={`Añadir ${cardTitle(card)}`}><Plus /></button><div><strong>{card.name}</strong><span>{card.version}</span><small className={`deck-copy-count${!copyState.canAdd ? ' at-limit' : ''}`}>{copyState.count}/{Number.isFinite(copyState.limit) ? copyState.limit : '∞'} en el mazo{!copyState.canAdd ? ' · Máximo' : ''}</small></div></article>
+              return <article key={card.id} className={`picker-card ownership-${ownership}`}><div className={`ownership-badge ${ownership}`}>{ownership === 'available' ? <><CheckCircle2 />Tienes {cardAvailability.remaining} disponible{cardAvailability.remaining === 1 ? '' : 's'}</> : ownership === 'used' ? 'Copias ya usadas' : 'No la tienes'}</div><button className="picker-preview" onClick={() => setSelectedCard({ id: card.id, name: card.name, version: card.version, imageUrl: card.image_url, setCode: card.set_code, setName: card.set_name, collectorNumber: card.collector_number, rarity: card.rarity, ink: card.ink, normalPriceEur: card.normal_price_eur, foilPriceEur: card.foil_price_eur })} aria-label={`Ver ${cardTitle(card)}`}>{card.image_url ? <img src={card.image_url} alt={cardTitle(card)} loading="lazy" /> : <span className="deck-thumb"><Sparkles /></span>}</button><button disabled={!copyState.canAdd} onClick={() => changeCard(card, 1)} title={copyState.canAdd ? `Añadir ${cardTitle(card)}` : `Máximo ${copyState.limit} copias entre todas las ediciones`} aria-label={`Añadir ${cardTitle(card)}`}><Plus /></button><div><strong>{card.name}</strong><span>{card.version}</span>{legality && !legality.legal && <small className="picker-format-warning" title={legality.message}>{legality.kind === 'banned' ? 'Prohibida' : legality.kind === 'unreleased' ? 'Pendiente de lanzamiento' : `Fuera de ${formatName(format!)}`}</small>}<small className={`deck-copy-count${!copyState.canAdd ? ' at-limit' : ''}`}>{copyState.count}/{Number.isFinite(copyState.limit) ? copyState.limit : '∞'} en el mazo{!copyState.canAdd ? ' · Máximo' : ''}</small></div></article>
             })}</div>}
           </div>
         </div>
       </div>
-      {importOpen && <div className="deck-modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setImportOpen(false) }}><section className="deck-import-modal" role="dialog" aria-modal="true" aria-labelledby="import-title"><header><div className="modal-icon"><FileUp /></div><div><p className="eyebrow">Añadir una lista</p><h2 id="import-title">Importar mazo</h2></div><button className="modal-close" onClick={() => setImportOpen(false)} aria-label="Cerrar importación"><X /></button></header><p className="import-intro">Pega una lista desde Dreamborn, InkDecks u otra web. También puedes subir un archivo <b>.txt</b> o <b>.csv</b>.</p><div className="import-source-actions"><button onClick={() => void pasteFromClipboard()} disabled={readingClipboard}><ClipboardPaste />{readingClipboard ? 'Leyendo…' : 'Pegar del portapapeles'}</button><label><FileUp />Elegir archivo<input type="file" accept=".txt,.csv" onChange={(event) => void importFile(event)} hidden /></label></div><label className="import-text-label"><span>Lista de cartas</span><small>Formato: cantidad + nombre de la carta</small><textarea autoFocus value={importText} onChange={(event) => { setImportText(event.target.value); setImportError('') }} placeholder={'4 Mickey Mouse - Brave Little Tailor\n4 Lumpy - Hunny Druid'} aria-label="Lista para importar" /></label>{importError && <p className="import-error" role="alert"><CircleAlert />{importError}</p>}<div className="import-example"><strong>Ejemplo compatible</strong><code>4 Mickey Mouse - Brave Little Tailor</code></div><footer><span>Al importar, se reemplazará la lista actual.</span><div><button className="cancel-command" onClick={() => setImportOpen(false)}>Cancelar</button><button className="save-command" onClick={submitImport} disabled={!importText.trim()}><FileUp />Importar lista</button></div></footer></section></div>}
+      {importOpen && <div className="deck-modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setImportOpen(false) }}><section className="deck-import-modal" role="dialog" aria-modal="true" aria-labelledby="import-title"><header><div className="modal-icon"><FileUp /></div><div><p className="eyebrow">Añadir una lista</p><h2 id="import-title">Importar mazo</h2></div><button className="modal-close" onClick={() => setImportOpen(false)} aria-label="Cerrar importación"><X /></button></header><p className="import-intro">Pega una lista desde Dreamborn, InkDecks u otra web. También puedes subir un archivo <b>.txt</b> o <b>.csv</b>.</p><FormatSelector value={importFormat} onChange={setImportFormat} /><div className="import-source-actions"><button onClick={() => void pasteFromClipboard()} disabled={readingClipboard}><ClipboardPaste />{readingClipboard ? 'Leyendo…' : 'Pegar del portapapeles'}</button><label><FileUp />Elegir archivo<input type="file" accept=".txt,.csv" onChange={(event) => void importFile(event)} hidden /></label></div><label className="import-text-label"><span>Lista de cartas</span><small>Formato: cantidad + nombre de la carta</small><textarea autoFocus value={importText} onChange={(event) => { setImportText(event.target.value); setImportError('') }} placeholder={'4 Mickey Mouse - Brave Little Tailor\n4 Lumpy - Hunny Druid'} aria-label="Lista para importar" /></label>{importError && <p className="import-error" role="alert"><CircleAlert />{importError}</p>}<div className="import-example"><strong>Ejemplo compatible</strong><code>4 Mickey Mouse - Brave Little Tailor</code></div><footer><span>Al importar, se reemplazará la lista actual.</span><div><button className="cancel-command" onClick={() => setImportOpen(false)}>Cancelar</button><button className="save-command" onClick={submitImport} disabled={!importText.trim() || !importFormat || loadingCatalog || !!catalogError}><FileUp />Importar lista</button></div></footer></section></div>}
       {selectedCard && <CardViewer card={selectedCard} canToggleFoil={selectedCard.foilPriceEur != null} ownershipForCard={ownershipForCard} onAddCopy={onAddCopy} onClose={() => setSelectedCard(null)} />}
     </section>
   )
@@ -450,12 +485,9 @@ export function PublicDeck({ deckId }: { deckId: string }) {
   const [selectedCard, setSelectedCard] = useState<ViewerCard | null>(null)
 
   useEffect(() => {
-    Promise.all([
-      supabase.from('decks').select('*').eq('id', deckId).eq('is_public', true).single(),
-      supabase.from('deck_entries').select('*').eq('deck_id', deckId),
-    ]).then(([deckResult, entryResult]) => {
-      if (deckResult.error || entryResult.error) setError('Este mazo no existe o es privado.')
-      else { setDeck(deckResult.data as Deck); setEntries((entryResult.data ?? []) as DeckEntry[]) }
+    supabase.rpc('get_public_deck', { target_deck_id: deckId }).then(({ data, error }) => {
+      if (error || !data?.deck) setError('Este mazo no existe o es privado.')
+      else { setDeck(data.deck as Deck); setEntries((data.entries ?? []) as DeckEntry[]) }
     })
   }, [deckId])
 
@@ -469,5 +501,5 @@ export function PublicDeck({ deckId }: { deckId: string }) {
   if (!deck) return <main className="public-deck-state"><Sparkles className="pulse" /><span>Abriendo mazo</span></main>
   const rules = validateDeck(entries)
   const deckValue = entries.reduce((sum, entry) => sum + (entry.normal_price_eur ?? 0) * entry.quantity, 0)
-  return <main className="public-deck-page"><header><a href={import.meta.env.BASE_URL}><img src={`${import.meta.env.BASE_URL}ink-icons/amethyst.png`} alt="" width="25" height="25" />MiTinta</a><div className="header-actions"><ThemeToggle /><button className="save-command" onClick={exportText}><Download />Descargar</button></div></header><section className="public-deck-hero"><div><p className="eyebrow">Mazo compartido</p><h1>{deck.name}</h1><p>{deck.description}</p></div><div className="public-deck-stats"><span><b>{rules.total}</b> cartas</span><span><b>{entries.length}</b> distintas</span><span><b>{rules.inks.length}</b> tintas</span><span><b>{deckValue.toLocaleString('es-ES', { style: 'currency', currency: 'EUR' })}</b> valor</span></div></section><DeckAnalysis entries={entries} publicView /><section className="public-card-grid">{entries.map((entry) => <article key={entry.card_id}><button className="public-card-preview" onClick={() => setSelectedCard({ name: entry.card_name, version: entry.card_version, imageUrl: entry.image_url, setCode: entry.set_code, collectorNumber: entry.collector_number, ink: entry.ink, normalPriceEur: entry.normal_price_eur, foilPriceEur: entry.foil_price_eur })} aria-label={`Ver ${entry.card_name}, ${entry.card_version}`}>{entry.image_url && <img src={entry.image_url} alt={cardTitle({ name: entry.card_name, version: entry.card_version })} />}</button><b>{entry.quantity}x</b><div><strong>{entry.card_name}</strong><span>{entry.card_version}</span></div></article>)}</section>{selectedCard && <CardViewer card={selectedCard} canToggleFoil={selectedCard.foilPriceEur != null} onClose={() => setSelectedCard(null)} />}</main>
+  return <main className="public-deck-page"><header><a href={import.meta.env.BASE_URL}><img src={`${import.meta.env.BASE_URL}ink-icons/amethyst.png`} alt="" width="25" height="25" />MiTinta</a><div className="header-actions"><ThemeToggle /><button className="save-command" onClick={exportText}><Download />Descargar</button></div></header><section className="public-deck-hero"><div><p className="eyebrow">Mazo compartido{deck.format ? ` · ${formatName(deck.format)}` : ' · Formato sin especificar'}</p><h1>{deck.name}</h1><p>{deck.description}</p></div><div className="public-deck-stats"><span><b>{rules.total}</b> cartas</span><span><b>{entries.length}</b> distintas</span><span><b>{rules.inks.length}</b> tintas</span><span><b>{deckValue.toLocaleString('es-ES', { style: 'currency', currency: 'EUR' })}</b> valor</span></div></section><DeckAnalysis entries={entries} publicView /><section className="public-card-grid">{entries.map((entry) => <article key={entry.card_id}><button className="public-card-preview" onClick={() => setSelectedCard({ name: entry.card_name, version: entry.card_version, imageUrl: entry.image_url, setCode: entry.set_code, collectorNumber: entry.collector_number, ink: entry.ink, normalPriceEur: entry.normal_price_eur, foilPriceEur: entry.foil_price_eur })} aria-label={`Ver ${entry.card_name}, ${entry.card_version}`}>{entry.image_url && <img src={entry.image_url} alt={cardTitle({ name: entry.card_name, version: entry.card_version })} />}</button><b>{entry.quantity}x</b><div><strong>{entry.card_name}</strong><span>{entry.card_version}</span></div></article>)}</section>{selectedCard && <CardViewer card={selectedCard} canToggleFoil={selectedCard.foilPriceEur != null} onClose={() => setSelectedCard(null)} />}</main>
 }

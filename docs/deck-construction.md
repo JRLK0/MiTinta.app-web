@@ -31,3 +31,28 @@ cierra la combinación con trazados concéntricos y un anillo de impacto.
 Los símbolos quedan visibles al terminar. Se anima al cambiar la identidad de
 tinta; añadir copias no reinicia el efecto. No bloquea acciones y cancela efectos
 anteriores si cambian las tintas rápidamente. Respeta movimiento reducido.
+
+## Formato Core / Infinity
+
+El constructor y el importador exigen elegir un formato; los mazos anteriores
+conservan formato nulo hasta que su propietario lo indique. El formato se guarda
+en `decks.format` y en el borrador local; los enlaces públicos lo muestran mediante
+`get_public_deck`. Aplicar `202610040001_deck_formats.sql` antes del despliegue.
+
+Core usa sets 9 en adelante tras la rotación del set 13. Una edición antigua sigue
+siendo legal cuando coincide el nombre completo y versión con una reimpresión
+vigente. El aviso ofrece sustituirla por una edición normal vigente, conserva
+las cantidades y combina filas si esa edición ya estaba añadida. Nunca cambia
+la colección del usuario. Las cartas no legales permanecen como borrador con
+avisos; no se presenta ese mazo como válido para el formato.
+
+Reglas verificadas el 4 de octubre de 2026: Core no tiene prohibiciones actuales;
+Infinity prohíbe Hiram Flaversham — Toymaker. Hyperia City se habilita el 16 de
+octubre, fecha de prelanzamiento. Los sets futuros desconocidos y cartas especiales
+sin edición construida confirmada no se declaran legales. Añadir las fechas y
+rotaciones nuevas a `deckFormat.ts` cuando se anuncien oficialmente.
+
+- https://files.disneylorcana.com/Tournament-Rules-7.14.2026_Update_EN.pdf (§1.6)
+- https://www.disneylorcana.com/en-GB/news/2026/08/rotation
+- https://www.disneylorcana.com/en-US/product/hyperia-city
+- https://www.disneylorcana.com/en-GB/news/2026/03/card-bans

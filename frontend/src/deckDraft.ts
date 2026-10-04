@@ -1,3 +1,5 @@
+import type { DeckFormat } from './deckFormat'
+
 export type DeckDraftEntry = {
   deck_id?: string
   card_id: string
@@ -19,6 +21,7 @@ export type DeckEditorState = {
   name: string
   description: string
   isPublic: boolean
+  format?: DeckFormat | null
   entries: DeckDraftEntry[]
 }
 
@@ -47,6 +50,7 @@ export function parseDeckDraft(value: string | null, expectedUserId: string): De
       draft.version !== 1 || draft.userId !== expectedUserId ||
       typeof draft.name !== 'string' || typeof draft.description !== 'string' ||
       typeof draft.isPublic !== 'boolean' || !Array.isArray(draft.entries) ||
+      !(draft.format == null || draft.format === 'core' || draft.format === 'infinity') ||
       typeof draft.updatedAt !== 'string' ||
       !(draft.activeId === null || typeof draft.activeId === 'string') ||
       draft.entries.some((entry) => (

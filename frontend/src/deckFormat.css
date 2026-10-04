@@ -1,0 +1,21 @@
+.deck-format-selector { display: flex; align-items: center; gap: 12px; padding: 12px 0; flex-wrap: wrap; }
+.deck-format-selector > span { font-size: 12px; font-weight: 650; color: var(--muted); }
+.deck-format-selector > div { display: flex; padding: 3px; border: 1px solid var(--line); background: var(--surface-raised); border-radius: 10px; gap: 3px; }
+.deck-format-selector button { padding: 8px 18px; border: 0; border-radius: 7px; background: transparent; color: var(--muted); font-size: 12px; font-weight: 650; min-height: 36px; }
+.deck-format-selector button.active { background: var(--accent-soft); color: var(--accent); box-shadow: 0 1px 3px #00000010; }
+.deck-format-selector > small { color: var(--muted); font-size: 11px; }
+.deck-row .deck-edition { font-size: 10px; margin: 3px 0 6px; color: var(--muted); }
+.deck-format-notice { margin: 7px 0; padding: 9px 10px; border-radius: 8px; background: var(--surface-raised); border-left: 2px solid var(--accent); }
+.deck-workspace .deck-row .deck-format-notice small { display: block; width: auto; max-width: 100%; white-space: normal; overflow-wrap: anywhere; color: var(--muted); line-height: 1.5; font-size: 11px; }
+.deck-overview .deck-rule-summary { flex-wrap: wrap; min-width: 0; }
+.deck-overview .deck-value-summary { flex-basis: 100%; margin-left: 0; padding-left: 0; border-left: 0; }
+.deck-format-notice.invalid { border-color: var(--danger); background: var(--danger-soft); }
+.deck-row .deck-format-notice.invalid small, .picker-card .picker-format-warning { color: var(--danger); }
+.deck-format-notice button { display: block; background: transparent; border: 0; color: var(--accent); padding: 6px 0 0; font-size: 11px; font-weight: 650; text-align: left; min-height: 32px; }
+.deck-import-modal .deck-format-selector { margin-bottom: 14px; }
+@media (max-width: 600px) {
+  .deck-workspace { overflow-x: clip; }
+  .deck-editor > .deck-format-selector { padding-inline: 16px; }
+  .deck-format-selector { gap: 8px; }
+  .deck-format-selector > small { width: 100%; }
+}

@@ -14,6 +14,13 @@ const editor: DeckEditorState = {
 }
 
 describe('deck drafts', () => {
+  it('keeps format changes dirty, restores formats and rejects corrupt values', () => {
+    const core = { ...editor, format: 'core' as const }
+    expect(parseDeckDraft(serializeDeckDraft('user-1', core), 'user-1')?.format).toBe('core')
+    expect(deckEditorFingerprint(core)).not.toBe(deckEditorFingerprint({ ...editor, format: 'infinity' }))
+    expect(parseDeckDraft(serializeDeckDraft('user-1', editor).replace('"isPublic":false', '"isPublic":false,"format":"bad"'), 'user-1')).toBeNull()
+    expect(parseDeckDraft(serializeDeckDraft('user-1', editor), 'user-1')?.format).toBeUndefined()
+  })
   it('restores quantities above 99 for cards without a construction limit', () => {
     const large = { ...editor, entries: [{ ...editor.entries[0], quantity: 120, card_name: 'Microbots', card_version: '' }] }
     expect(parseDeckDraft(serializeDeckDraft('user-1', large), 'user-1')).toMatchObject(large)
