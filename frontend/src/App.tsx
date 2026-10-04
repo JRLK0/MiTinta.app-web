@@ -3,11 +3,9 @@ import type { Session } from '@supabase/supabase-js'
 import {
   CircleUserRound,
   Cloud,
-  Download,
   Layers3,
   LibraryBig,
   ListChecks,
-  PackagePlus,
   Rows3,
   LogOut,
   Minus,
@@ -31,6 +29,7 @@ import { playValuableCardSound, prepareValuableCardSound, valuableCardSoundFor }
 import { parsePriceHistory, priceTrendFor, updatePriceHistory, type PriceHistory } from './priceHistory'
 import { loadAllPages } from './pagination'
 import { SetCollectionView } from './SetCollectionView'
+import { CollectionActions } from './CollectionActions'
 import { StarterDeckImporter } from './StarterDeckImporter'
 import { starterDeckTotals, type StarterDeck } from './starterDecks'
 import { collectionQuantitiesByPrinting, printingKey } from './setCollection'
@@ -117,7 +116,7 @@ function LoadingScreen() {
 
 function AuthScreen() {
   const [createAccount, setCreateAccount] = useState(false)
-  const [email, setEmail] = useState('')
+  const [email, setEmail] = useState(() => new URLSearchParams(window.location.search).get('email') ?? '')
   const [password, setPassword] = useState('')
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState('')
@@ -163,13 +162,13 @@ function AuthScreen() {
     <main className="auth-shell">
       <section className="auth-panel" aria-labelledby="auth-title">
         <div className="brand-lockup">
-          <span className="brand-mark"><Sparkles aria-hidden="true" /></span>
+          <span className="brand-mark"><img src={`${import.meta.env.BASE_URL}ink-icons/amethyst.png`} alt="" width="30" height="30" /></span>
           <div>
-            <p className="eyebrow">Archivo personal</p>
-            <h1 id="auth-title">Lorcana Lector</h1>
+
+            <h1 id="auth-title">MiTinta</h1>
           </div>
         </div>
-        <p className="auth-intro">Tu colección del móvil, disponible aquí en cuanto escaneas una carta.</p>
+        <p className="auth-intro">Tu colección de Lorcana, siempre contigo.</p>
         {!isConfigured && (
           <p className="notice error">Falta configurar la conexión pública con Supabase.</p>
         )}
@@ -194,8 +193,9 @@ function AuthScreen() {
         </form>
       </section>
       <aside className="auth-art" aria-hidden="true">
-        <div className="edition-stamp">CATÁLOGO<br />PERSONAL<br /><b>2026</b></div>
-        <p>Escanea en Android.<br />Ordena aquí.</p>
+        <img className="auth-card" src="https://cards.lorcast.io/card/digital/full/crd_cbc18e77d7ec4d50bf19650a9a559686.jpg" alt="" width="252" height="352" />
+        <p>Cada carta,<br />en su sitio.</p>
+        <span>Escanea en Android. Disfruta tu colección aquí.</span>
       </aside>
     </main>
   )
@@ -221,7 +221,7 @@ function PasswordRecoveryScreen({ onComplete }: { onComplete: () => void }) {
 
   return <main className="recovery-shell">
     <section className="recovery-panel" aria-labelledby="recovery-title">
-      <div className="brand-lockup"><span className="brand-mark"><Sparkles aria-hidden="true" /></span><div><p className="eyebrow">Cuenta personal</p><h1 id="recovery-title">Nueva contraseña</h1></div></div>
+      <div className="brand-lockup"><span className="brand-mark"><img src={`${import.meta.env.BASE_URL}ink-icons/amethyst.png`} alt="" width="30" height="30" /></span><div><p className="eyebrow">MiTinta</p><h1 id="recovery-title">Nueva contraseña</h1></div></div>
       <form onSubmit={updatePassword}>
         <label>Nueva contraseña<input type="password" autoComplete="new-password" value={password} onChange={(event) => setPassword(event.target.value)} minLength={6} required /></label>
         <label>Confirmar contraseña<input type="password" autoComplete="new-password" value={confirmation} onChange={(event) => setConfirmation(event.target.value)} minLength={6} required /></label>
@@ -545,27 +545,20 @@ function CollectionDashboard({ session }: { session: Session }) {
     <div className="app-shell">
       <header className="topbar">
         <div className="brand-lockup compact">
-          <span className="brand-mark"><Sparkles aria-hidden="true" /></span>
-          <div><p className="eyebrow">Lorcana Lector</p><strong className="current-view-label">{activeViewLabel}<i title="Sincronización activa" aria-label="Sincronización activa" /></strong></div>
+          <span className="brand-mark"><img src={`${import.meta.env.BASE_URL}ink-icons/amethyst.png`} alt="" width="30" height="30" /></span>
+          <div><span className="app-brand-name">MiTinta</span><strong className="current-view-label">{activeViewLabel}<i title="Sincronización activa" aria-label="Sincronización activa" /></strong></div>
         </div>
-        <div className="account-actions">
-          <span><CircleUserRound aria-hidden="true" />{session.user.email}</span>
-          <button
-            className={`icon-command${soundEnabled ? ' sound-on' : ''}`}
-            onClick={() => {
-              const next = !soundEnabled
-              setSoundEnabled(next)
-              if (next) void playValuableCardSound()
-            }}
-            title={soundEnabled ? 'Desactivar sonido de cartas valiosas' : 'Activar sonido de cartas valiosas'}
-            aria-label={soundEnabled ? 'Desactivar sonido de cartas valiosas' : 'Activar sonido de cartas valiosas'}
-            aria-pressed={soundEnabled}
-          >
-            {soundEnabled ? <Volume2 /> : <VolumeX />}
-          </button>
-          <button className="icon-command danger" onClick={() => void deleteAccount()} title="Eliminar cuenta y datos" aria-label="Eliminar cuenta y datos"><Trash2 /></button>
-          <button className="icon-command" onClick={() => void supabase.auth.signOut()} title="Cerrar sesión" aria-label="Cerrar sesión"><LogOut /></button>
-        </div>
+        <AccountMenu
+          email={session.user.email ?? ''}
+          soundEnabled={soundEnabled}
+          onToggleSound={() => {
+            const next = !soundEnabled
+            setSoundEnabled(next)
+            if (next) void playValuableCardSound()
+          }}
+          onDeleteAccount={() => void deleteAccount()}
+          onSignOut={() => void supabase.auth.signOut()}
+        />
       </header>
 
       <main className={`collection-main view-${activeView}`}>
@@ -575,10 +568,9 @@ function CollectionDashboard({ session }: { session: Session }) {
             <button className={activeView === 'catalog' ? 'active' : ''} onClick={() => setActiveView('catalog')}><LibraryBig aria-hidden="true" />Catálogo</button>
             <button className={activeView === 'decks' ? 'active' : ''} onClick={() => setActiveView('decks')}><ListChecks aria-hidden="true" />Mazos</button>
           </nav>
-          {activeView === 'collection' && <button className="starter-import-open" onClick={() => { setStarterImportMessage(''); setStarterImporterOpen(true) }} disabled={catalogMetadata.length === 0} title="Importar mazo comprado"><PackagePlus aria-hidden="true" /><span>Importar mazo comprado</span></button>}
-          {activeView === 'collection' && <button className="export-command" onClick={downloadDreambornCsv} disabled={entries.length === 0} title="Exportar a Dreamborn" aria-label="Exportar a Dreamborn">
-            <Download aria-hidden="true" /><span>Exportar a Dreamborn</span>
-          </button>}
+          {activeView === 'collection' && <CollectionActions canImport={catalogMetadata.length > 0} canExport={entries.length > 0}
+            onImport={() => { setStarterImportMessage(''); setStarterImporterOpen(true) }} onExport={downloadDreambornCsv} />}
+
         </section>
 
         {error && <p className="notice error">No se pudo actualizar la colección: {error}</p>}
@@ -600,7 +592,7 @@ function CollectionDashboard({ session }: { session: Session }) {
 
           {collectionMode === 'cards' ? <>
           <section className="collection-tools" aria-label="Filtros de colección">
-          <CardFilterBar cards={collectionFilterCards} filters={filters} onFiltersChange={setFilters} sort={sort} sortOptions={COLLECTION_SORT_OPTIONS} onSortChange={(value) => setSort(value as CollectionSortMode)} resultCount={visibleEntries.length} totalCount={entries.length} extraActiveCount={finish === 'ALL' ? 0 : 1} onReset={() => setFinish('ALL')} specificControls={<div className="specific-filter-control"><span>Acabado</span><div>{(['ALL', 'NORMAL', 'FOIL'] as FinishFilter[]).map((value) => <button key={value} className={finish === value ? 'active' : ''} onClick={() => setFinish(value)}>{value === 'ALL' ? 'Todos' : value === 'NORMAL' ? 'Normal' : 'Foil'}</button>)}</div></div>} />
+          <CardFilterBar cards={collectionFilterCards} filters={filters} onFiltersChange={setFilters} sort={sort} sortOptions={COLLECTION_SORT_OPTIONS} onSortChange={(value) => setSort(value as CollectionSortMode)} resultCount={visibleEntries.length} totalCount={entries.length} extraActiveCount={finish === 'ALL' ? 0 : 1} extraActiveLabel={finish === 'FOIL' ? 'Acabado: Foil' : 'Acabado: Normal'} onReset={() => setFinish('ALL')} specificControls={<div className="specific-filter-control"><span>Acabado</span><div>{(['ALL', 'NORMAL', 'FOIL'] as FinishFilter[]).map((value) => <button key={value} className={finish === value ? 'active' : ''} onClick={() => setFinish(value)}>{value === 'ALL' ? 'Todos' : value === 'NORMAL' ? 'Normal' : 'Foil'}</button>)}</div></div>} />
           <div className="display-strip">
             <span><SlidersHorizontal aria-hidden="true" />Tamaño</span>
             <div className="zoom-control" aria-label="Tamaño de las cartas">
@@ -612,7 +604,7 @@ function CollectionDashboard({ session }: { session: Session }) {
           </section>
 
           {visibleEntries.length === 0 ? (
-            <section className="empty-state"><Sparkles aria-hidden="true" /><h2>Tu colección está esperando</h2><p>Escanea una carta desde la aplicación Android para verla aquí.</p></section>
+            <section className="empty-state"><Sparkles aria-hidden="true" /><h2>{entries.length ? 'No hay cartas con estos filtros' : 'Tu colección está esperando'}</h2><p>{entries.length ? 'Prueba otras opciones o limpia los filtros activos.' : 'Escanea una carta desde la aplicación Android para verla aquí.'}</p></section>
           ) : (
             <section className="card-grid" aria-label="Cartas de la colección" style={{ '--card-size': `${cardSize}px` } as CSSProperties}>
               {visibleEntries.map((entry) => {
@@ -627,6 +619,59 @@ function CollectionDashboard({ session }: { session: Session }) {
       {selectedEntry && <CardViewer card={{ id: selectedEntry.card_id, name: selectedEntry.card_name, version: selectedEntry.card_version, imageUrl: selectedEntry.image_url, setCode: selectedEntry.set_code, setName: selectedEntry.set_name, collectorNumber: selectedEntry.collector_number, rarity: selectedEntry.rarity, ink: selectedEntry.ink, normalPriceEur: selectedEntry.normal_price_eur, foilPriceEur: selectedEntry.foil_price_eur, language: selectedEntry.language }} foil={effectiveCardFinish(selectedEntry.rarity, selectedEntry.finish) === 'FOIL'} canToggleFoil ownershipForCard={ownershipForCard} onAddCopy={addCopy} onClose={() => setSelectedEntry(null)} />}
       {arrivalCelebration && <ScanArrivalCelebration key={arrivalCelebration.nonce} entry={arrivalCelebration.entry} jackpot={arrivalCelebration.jackpot} />}
       {starterImporterOpen && <StarterDeckImporter catalog={catalogMetadata} busy={starterImportBusy} onClose={() => setStarterImporterOpen(false)} onImport={importStarterDeck} />}
+      <nav className="app-bottom-nav" aria-label="Vistas de la cuenta">
+        <button className={activeView === 'collection' ? 'active' : ''} onClick={() => setActiveView('collection')}><Layers3 aria-hidden="true" />Colección</button>
+        <button className={activeView === 'catalog' ? 'active' : ''} onClick={() => setActiveView('catalog')}><LibraryBig aria-hidden="true" />Catálogo</button>
+        <button className={activeView === 'decks' ? 'active' : ''} onClick={() => setActiveView('decks')}><ListChecks aria-hidden="true" />Mazos</button>
+      </nav>
+    </div>
+  )
+}
+
+function AccountMenu({
+  email,
+  soundEnabled,
+  onToggleSound,
+  onDeleteAccount,
+  onSignOut,
+}: {
+  email: string
+  soundEnabled: boolean
+  onToggleSound: () => void
+  onDeleteAccount: () => void
+  onSignOut: () => void
+}) {
+  const [open, setOpen] = useState(false)
+  const root = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!open) return
+    const close = (event: MouseEvent) => { if (!root.current?.contains(event.target as Node)) setOpen(false) }
+    const escape = (event: KeyboardEvent) => { if (event.key === 'Escape') setOpen(false) }
+    document.addEventListener('mousedown', close)
+    document.addEventListener('keydown', escape)
+    return () => {
+      document.removeEventListener('mousedown', close)
+      document.removeEventListener('keydown', escape)
+    }
+  }, [open])
+
+  return (
+    <div className={`account-menu${open ? ' open' : ''}`} ref={root}>
+      <button className="account-menu-trigger" onClick={() => setOpen((current) => !current)} aria-expanded={open} aria-haspopup="menu">
+        <CircleUserRound aria-hidden="true" />
+        <span>{email}</span>
+      </button>
+      {open && (
+        <div className="account-menu-panel" role="menu">
+          <button type="button" role="menuitem" onClick={() => { onToggleSound(); }}>
+            {soundEnabled ? <Volume2 /> : <VolumeX />}
+            {soundEnabled ? 'Silenciar cartas valiosas' : 'Sonido de cartas valiosas'}
+          </button>
+          <button type="button" role="menuitem" className="danger" onClick={onDeleteAccount}><Trash2 />Eliminar cuenta</button>
+          <button type="button" role="menuitem" onClick={onSignOut}><LogOut />Cerrar sesión</button>
+        </div>
+      )}
     </div>
   )
 }

@@ -5,15 +5,21 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
+    "dev:landing": "vite --config vite.landing.config.ts",
+    "build": "tsc -b && vite build && vite build --config vite.landing.config.ts",
+    "build:local": "tsc -b && vite build && vite build --config vite.landing.config.ts",
+    "preview:site": "npx --yes serve . -p 4173",
     "sync:catalog": "node scripts/sync-catalog.mjs",
     "sync:foil-profiles": "node scripts/sync-foil-profiles.mjs",
     "test": "vitest run",
     "preview": "vite preview"
   },
   "dependencies": {
+    "@fontsource-variable/archivo": "^5.3.0",
+    "@fontsource-variable/martian-mono": "^5.3.0",
     "@supabase/supabase-js": "^2.57.4",
     "lucide-react": "^0.544.0",
+    "motion": "^14.0.0",
     "papaparse": "^5.6.0",
     "react": "^19.1.1",
     "react-dom": "^19.1.1"

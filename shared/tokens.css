@@ -1,0 +1,22 @@
+:root {
+  color-scheme: light;
+  --paper: #ffffff; --surface: #ffffff; --surface-raised: #f5f5f7; --surface-glass: #ffffff;
+  --ink: #1d1d1f; --muted: #626269; --line: #e4e4e9; --line-bright: #c6c6cf;
+  --accent: #7040a0; --accent-hover: #5d3288; --accent-soft: #f3edf8;
+  --success: #206347; --success-soft: #edf6f1; --danger: #a32d3d; --danger-soft: #fbedef;
+  /* Compatibility aliases for the existing components. */
+  --carbon-0: var(--paper); --carbon-1: var(--surface-raised); --carbon-2: var(--surface); --carbon-3: #ededf0; --carbon-4: var(--line-bright);
+  --ink-print: var(--accent); --ink-strong: var(--ink); --ink-mute: var(--muted);
+  --rule: var(--line); --rule-strong: var(--line-bright); --stamp: var(--danger); --stamp-soft: var(--danger-soft);
+  --green: var(--accent); --green-deep: var(--accent-hover); --green-soft: var(--accent-soft); --coral: var(--danger); --gold: var(--accent); --gold-soft: var(--accent-soft);
+  --shadow-soft: 0 12px 32px rgba(29,29,31,.1); --shadow-card: 0 8px 22px rgba(29,29,31,.09);
+  --radius-sm: 10px; --radius-md: 14px; --radius-lg: 16px; --radius-pill: 999px;
+  --ease-out: cubic-bezier(.23,1,.32,1); --ease-in-out: cubic-bezier(.77,0,.175,1); --ease-drawer: cubic-bezier(.32,.72,0,1);
+  --z-nav: 20; --z-popover: 140; --z-modal: 100; --z-toast: 150;
+  --font-ui: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; --font-num: var(--font-ui);
+  font-family: var(--font-ui); font-synthesis: none;
+}
+::selection { color: var(--ink); background: #e6d6f4; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+html { scrollbar-color: #bcbcc5 var(--surface-raised); scrollbar-width: thin; }
+input, textarea { caret-color: var(--accent); }
