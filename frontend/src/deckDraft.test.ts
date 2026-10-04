@@ -14,6 +14,10 @@ const editor: DeckEditorState = {
 }
 
 describe('deck drafts', () => {
+  it('restores quantities above 99 for cards without a construction limit', () => {
+    const large = { ...editor, entries: [{ ...editor.entries[0], quantity: 120, card_name: 'Microbots', card_version: '' }] }
+    expect(parseDeckDraft(serializeDeckDraft('user-1', large), 'user-1')).toMatchObject(large)
+  })
   it('round-trips a draft only for its owner', () => {
     const serialized = serializeDeckDraft('user-1', editor, '2026-08-21T12:00:00Z')
     expect(parseDeckDraft(serialized, 'user-1')).toMatchObject(editor)

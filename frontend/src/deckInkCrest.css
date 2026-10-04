@@ -1,0 +1,23 @@
+.deck-ink-crest { position: relative; isolation: isolate; display: flex; align-items: center; justify-content: center; min-width: 90px; min-height: 56px; padding: 4px 8px; flex-shrink: 0; }
+.deck-ink-seals { display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: 7px; max-width: 152px; }
+.deck-ink-seal { position: relative; display: grid; place-items: center; width: 43px; height: 43px; border-radius: 50%; background: radial-gradient(circle, color-mix(in srgb, var(--seal-color) 19%, var(--surface)) 0%, var(--surface) 72%); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--seal-color) 40%, transparent), 0 2px 12px color-mix(in srgb, var(--seal-color) 14%, transparent); }
+.deck-ink-seal img { width: 29px; height: 29px; object-fit: contain; filter: drop-shadow(0 1px 4px color-mix(in srgb, var(--seal-color) 38%, transparent)); }
+.deck-ink-seal .deck-ink-fragment { position: absolute; opacity: 0; pointer-events: none; }
+.fragment-0 { clip-path: inset(0 50% 50% 0); }
+.fragment-1 { clip-path: inset(0 0 50% 50%); }
+.fragment-2 { clip-path: inset(50% 50% 0 0); }
+.fragment-3 { clip-path: inset(50% 0 0 50%); }
+.deck-ink-crest.combined::before { content: ''; position: absolute; z-index: -1; inset: 9px 3px; border-radius: 32px; background: linear-gradient(105deg, color-mix(in srgb, var(--crest-a) 12%, transparent), color-mix(in srgb, var(--crest-b) 12%, transparent)); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--crest-a) 15%, transparent); }
+.deck-ink-seal > i { position: absolute; inset: -3px; border: 1px solid color-mix(in srgb, var(--seal-color) 48%, transparent); border-radius: 50%; mask-image: conic-gradient(black 0deg 75deg, transparent 75deg 100deg, black 100deg 255deg, transparent 255deg 280deg, black 280deg); transform: rotate(-24deg); }
+.deck-ink-seal.guest { width: 27px; height: 27px; }
+.deck-ink-seal.guest img { width: 19px; height: 19px; }
+.deck-ink-fusion { position: absolute; inset: -8px -10px; opacity: 0; pointer-events: none; border-radius: 50%; background: conic-gradient(from 20deg, transparent, var(--crest-a), transparent 38%, var(--crest-b), transparent 83%); mask-image: radial-gradient(ellipse, transparent 48%, black 52%, black 58%, transparent 67%); }
+.deck-ink-mote { position: absolute; width: 4px; height: 4px; border-radius: 50%; background: var(--crest-a); box-shadow: 0 0 6px var(--crest-a); opacity: 0; pointer-events: none; }
+.deck-ink-mote:nth-of-type(even) { background: var(--crest-b); box-shadow: 0 0 6px var(--crest-b); }
+.deck-ink-unformed { display: grid; place-items: center; width: 43px; height: 43px; border-radius: 50%; border: 1px dashed var(--line); color: var(--muted); font-size: 22px; opacity: .55; }
+.deck-ink-crest.invalid .deck-ink-seals { border-bottom: 2px solid var(--danger); padding-bottom: 4px; }
+.deck-construction-status { margin: 0; padding: 9px 15px; font-size: 12px; line-height: 1.5; color: var(--muted); border-bottom: 1px solid var(--line); }
+.deck-construction-status.bad { color: var(--danger); }
+.deck-construction-status p { margin: 0; }
+@media (prefers-reduced-motion: reduce) { .deck-ink-fusion, .deck-ink-mote { display: none; } }
+@media (max-width: 420px) { .deck-ink-seals { max-width: 115px; gap: 5px; } .deck-ink-seal { width: 36px; height: 36px; } .deck-ink-seal img { width: 25px; height: 25px; } }

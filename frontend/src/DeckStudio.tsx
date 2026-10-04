@@ -1,3 +1,5 @@
+import { DeckInkCrest } from './DeckInkCrest'
+import { validateDeck } from './deckRules'
 import { ThemeToggle } from '../../shared/ThemeToggle'
 import { ChangeEvent, useEffect, useMemo, useState } from 'react'
 import type { Session } from '@supabase/supabase-js'
@@ -57,21 +59,8 @@ function normalize(value: string) {
   return value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('en').replace(/\s+/g, ' ').trim()
 }
 
-function deckCopyKey(entry: Pick<DeckEntry, 'card_name' | 'card_version'>) {
-  return normalize(`${entry.card_name} - ${entry.card_version}`)
-}
-
 function euro(value: number) {
   return value.toLocaleString('es-ES', { style: 'currency', currency: 'EUR' })
-}
-
-function validation(entries: DeckEntry[]) {
-  const total = entries.reduce((sum, entry) => sum + entry.quantity, 0)
-  const inks = new Set(entries.flatMap((entry) => entry.ink?.split('/').map((ink) => ink.trim()).filter(Boolean) ?? []))
-  const copies = new Map<string, number>()
-  entries.forEach((entry) => copies.set(deckCopyKey(entry), (copies.get(deckCopyKey(entry)) ?? 0) + entry.quantity))
-  const tooMany = Array.from(copies.values()).filter((count) => count > 4).length
-  return { total, inks: Array.from(inks), tooMany, valid: total === 60 && inks.size <= 2 && tooMany === 0 }
 }
 
 function DeckAnalysis({ entries, publicView = false }: { entries: DeckAnalyticsEntry[]; publicView?: boolean }) {
@@ -210,14 +199,14 @@ export function DeckStudio({ session, collection, ownershipForCard, onAddCopy }:
       const existing = current.find((entry) => entry.card_id === card.id)
       if (!existing && delta > 0) return [...current, entryFromCard(card)]
       return current
-        .map((entry) => entry.card_id === card.id ? { ...entry, quantity: Math.max(0, Math.min(99, entry.quantity + delta)) } : entry)
+        .map((entry) => entry.card_id === card.id ? { ...entry, quantity: Math.max(0, Math.min(Number.MAX_SAFE_INTEGER, entry.quantity + delta)) } : entry)
         .filter((entry) => entry.quantity > 0)
     })
   }
 
   function changeEntry(cardId: string, delta: number) {
     setEntries((current) => current
-      .map((entry) => entry.card_id === cardId ? { ...entry, quantity: Math.max(0, Math.min(99, entry.quantity + delta)) } : entry)
+      .map((entry) => entry.card_id === cardId ? { ...entry, quantity: Math.max(0, Math.min(Number.MAX_SAFE_INTEGER, entry.quantity + delta)) } : entry)
       .filter((entry) => entry.quantity > 0))
   }
 
@@ -361,7 +350,7 @@ export function DeckStudio({ session, collection, ownershipForCard, onAddCopy }:
       .filter((card): card is CatalogCard => card != null)
       .slice(0, 120)
   }, [availability, catalogById, filterableCatalog, filters, onlyAvailable, sort])
-  const rules = useMemo(() => validation(entries), [entries])
+  const rules = useMemo(() => validateDeck(entries), [entries])
   const missing = Array.from(availability.values()).reduce((sum, card) => sum + card.missing, 0)
   const ownedInDeck = Math.max(0, rules.total - missing)
   const priceSummary = useMemo(() => buildDeckPriceSummary(collection, entries), [collection, entries])
@@ -392,13 +381,13 @@ export function DeckStudio({ session, collection, ownershipForCard, onAddCopy }:
         <div className="deck-overview" aria-label="Estado del mazo">
           <div className="deck-progress-card"><span>Construcción</span><strong>{rules.total}<small>/60</small></strong><div className="deck-progress-track"><i style={{ width: `${Math.min(100, (rules.total / 60) * 100)}%` }} /></div></div>
           <div className={`ownership-summary${missing > 0 ? ' incomplete' : ''}`}>
-            <span>{missing > 0 ? 'Colección incompleta' : 'Listo para jugar'}</span>
+            <span>{missing > 0 ? 'Colección incompleta' : 'Copias completas'}</span>
             <strong>{ownedInDeck} de {rules.total}</strong>
             <small>{missing > 0 ? `Te faltan ${missing} ${missing === 1 ? 'carta' : 'cartas'}` : 'Tienes todas las copias'}</small>
             {missing > 0 && <button className="cardmarket-export" onClick={downloadCardmarketMissing}><FileDown />Exportar a Cardmarket</button>}
           </div>
           <div className="deck-rule-summary">
-            <span className={rules.inks.length <= 2 ? 'ok' : 'bad'}><b>{rules.inks.length}/2</b> tintas</span>
+            <span className={rules.inksValid ? 'ok' : 'bad'}><b>{rules.inks.length}{rules.hunnyEnabled ? '' : '/2'}</b> tintas{rules.hunnyEnabled ? ' · Hunny' : ''}</span>
             <span className={rules.tooMany === 0 ? 'ok' : 'bad'}>{rules.tooMany === 0 ? <CheckCircle2 /> : <CircleAlert />}{rules.tooMany === 0 ? 'Copias válidas' : `${rules.tooMany} excesos`}</span>
             <div className="deck-value-summary">
               <span><small>Valor del mazo</small><b>≈ {euro(priceSummary.deckValue)}</b>{priceSummary.deckUnpriced > 0 && <em>+{priceSummary.deckUnpriced} sin precio</em>}</span>
@@ -411,7 +400,8 @@ export function DeckStudio({ session, collection, ownershipForCard, onAddCopy }:
 
         <div className="deck-canvas">
           <div className="deck-stack">
-            <div className="section-title"><div><h3>Tu lista</h3><span>{entries.length} cartas distintas</span></div>{rules.inks.map((value) => <i key={value} className={`ink-dot ink-${value.toLowerCase()}`} title={value} />)}</div>
+            <div className="section-title"><div><h3>Tu lista</h3><span>{entries.length} cartas distintas</span></div><DeckInkCrest inks={rules.inks} baseInks={rules.baseInks} invalid={!rules.inksValid} /></div>
+            <div className={`deck-construction-status${rules.valid ? '' : ' bad'}`} aria-live="polite"><p>{rules.valid ? 'Construcción válida · 60 cartas o más' : rules.issues.join(' ')}</p>{rules.hunnyEnabled && <p>Christopher Robin: base Amatista/Zafiro; otras tintas solo en personajes Hunny.</p>}</div>
             <div className="deck-card-rows">
               {[...entries].sort((a, b) => (a.cost ?? 99) - (b.cost ?? 99) || a.card_name.localeCompare(b.card_name)).map((entry) => {
                 const availabilityKey = deckAvailabilityKey(entry.card_name, entry.card_version)
@@ -474,7 +464,7 @@ export function PublicDeck({ deckId }: { deckId: string }) {
 
   if (error) return <main className="public-deck-state"><CircleAlert /><h1>{error}</h1><a href={import.meta.env.BASE_URL}>Volver a Lorcana Lector</a></main>
   if (!deck) return <main className="public-deck-state"><Sparkles className="pulse" /><span>Abriendo mazo</span></main>
-  const rules = validation(entries)
+  const rules = validateDeck(entries)
   const deckValue = entries.reduce((sum, entry) => sum + (entry.normal_price_eur ?? 0) * entry.quantity, 0)
   return <main className="public-deck-page"><header><a href={import.meta.env.BASE_URL}><img src={`${import.meta.env.BASE_URL}ink-icons/amethyst.png`} alt="" width="25" height="25" />MiTinta</a><div className="header-actions"><ThemeToggle /><button className="save-command" onClick={exportText}><Download />Descargar</button></div></header><section className="public-deck-hero"><div><p className="eyebrow">Mazo compartido</p><h1>{deck.name}</h1><p>{deck.description}</p></div><div className="public-deck-stats"><span><b>{rules.total}</b> cartas</span><span><b>{entries.length}</b> distintas</span><span><b>{rules.inks.length}</b> tintas</span><span><b>{deckValue.toLocaleString('es-ES', { style: 'currency', currency: 'EUR' })}</b> valor</span></div></section><DeckAnalysis entries={entries} publicView /><section className="public-card-grid">{entries.map((entry) => <article key={entry.card_id}><button className="public-card-preview" onClick={() => setSelectedCard({ name: entry.card_name, version: entry.card_version, imageUrl: entry.image_url, setCode: entry.set_code, collectorNumber: entry.collector_number, ink: entry.ink, normalPriceEur: entry.normal_price_eur, foilPriceEur: entry.foil_price_eur })} aria-label={`Ver ${entry.card_name}, ${entry.card_version}`}>{entry.image_url && <img src={entry.image_url} alt={cardTitle({ name: entry.card_name, version: entry.card_version })} />}</button><b>{entry.quantity}x</b><div><strong>{entry.card_name}</strong><span>{entry.card_version}</span></div></article>)}</section>{selectedCard && <CardViewer card={selectedCard} canToggleFoil={selectedCard.foilPriceEur != null} onClose={() => setSelectedCard(null)} />}</main>
 }

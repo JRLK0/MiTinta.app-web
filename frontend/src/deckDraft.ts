@@ -51,7 +51,7 @@ export function parseDeckDraft(value: string | null, expectedUserId: string): De
       !(draft.activeId === null || typeof draft.activeId === 'string') ||
       draft.entries.some((entry) => (
         !entry || typeof entry.card_id !== 'string' || typeof entry.card_name !== 'string' ||
-        !Number.isInteger(entry.quantity) || entry.quantity < 1 || entry.quantity > 99
+        !Number.isSafeInteger(entry.quantity) || entry.quantity < 1
       ))
     ) return null
     return draft as DeckDraft
