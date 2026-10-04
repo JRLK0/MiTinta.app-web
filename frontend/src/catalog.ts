@@ -115,7 +115,7 @@ async function loadLorcastCatalog() {
 
 async function loadBundledCatalog() {
   try {
-    const response = await fetch(`${import.meta.env.BASE_URL}catalog.json`)
+    const response = await fetch(`${import.meta.env.BASE_URL}catalog.json`, { cache: 'no-cache' })
     if (!response.ok) return []
     const payload = await response.json() as { cards?: CatalogCard[] }
     return payload.cards ?? []
