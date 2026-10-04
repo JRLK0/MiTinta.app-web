@@ -32,6 +32,13 @@ Los símbolos quedan visibles al terminar. Se anima al cambiar la identidad de
 tinta; añadir copias no reinicia el efecto. No bloquea acciones y cancela efectos
 anteriores si cambian las tintas rápidamente. Respeta movimiento reducido.
 
+Tras la formación, un segundo canvas mantiene pigmento vivo detrás de los sellos:
+corrientes curvas intercambian los colores y pequeñas nubes los recorren. Funciona
+también al abrir un mazo existente, con una tinta o con varias (incluidas Hunny).
+Los símbolos permanecen quietos. Se limita a 30 fotogramas/s y DPR 2; pausa cuando
+el sello queda fuera de pantalla o la pestaña está oculta. Movimiento reducido
+desactiva el fondo y puede cambiarse durante la sesión.
+
 ## Formato Core / Infinity
 
 El constructor y el importador exigen elegir un formato; los mazos anteriores

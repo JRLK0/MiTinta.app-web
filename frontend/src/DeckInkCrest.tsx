@@ -1,5 +1,5 @@
 import { useLayoutEffect, useRef, type CSSProperties } from 'react'
-import { animateDeckInk } from './deckInkAnimation'
+import { animateDeckInk, animateDeckInkAmbient } from './deckInkAnimation'
 import './deckInkCrest.css'
 
 const inkStyle: Record<string, { color: string; name: string }> = {
@@ -11,8 +11,13 @@ const inkStyle: Record<string, { color: string; name: string }> = {
 export function DeckInkCrest({ inks, baseInks, invalid = false }: { inks: string[]; baseInks: string[]; invalid?: boolean }) {
   const host = useRef<HTMLDivElement>(null)
   const canvas = useRef<HTMLCanvasElement>(null)
+  const ambient = useRef<HTMLCanvasElement>(null)
   const previous = useRef(inks.join('|'))
   const signature = inks.join('|')
+  useLayoutEffect(() => {
+    if (!host.current || !ambient.current) return
+    return animateDeckInkAmbient(ambient.current, host.current, Object.fromEntries(Object.entries(inkStyle).map(([ink, style]) => [ink, style.color])))
+  }, [signature])
   useLayoutEffect(() => {
     const old = previous.current.split('|')
     previous.current = signature
@@ -59,6 +64,7 @@ export function DeckInkCrest({ inks, baseInks, invalid = false }: { inks: string
   const known = inks.filter(ink => inkStyle[ink])
   const label = known.map(ink => inkStyle[ink].name).join(' + ')
   return <div ref={host} className={`deck-ink-crest${known.length > 1 ? ' combined' : ''}${invalid ? ' invalid' : ''}`} role="img" aria-label={label ? `Tintas: ${label}${invalid ? '. Combinación no válida' : ''}` : 'Sin tinta: añade tu primera carta'} title={label || 'Tu tinta se formará aquí'} style={{ '--crest-a': inkStyle[known[0]]?.color ?? '#9856cf', '--crest-b': inkStyle[known[1]]?.color ?? inkStyle[known[0]]?.color ?? '#329be0' } as CSSProperties}>
+    <canvas ref={ambient} className="deck-ink-ambient" aria-hidden="true" />
     <canvas ref={canvas} className="deck-ink-energy" aria-hidden="true" />
     <div className="deck-ink-seals">
       {known.map(ink => <span key={ink} data-ink={ink} className={`deck-ink-seal${baseInks.includes(ink) ? '' : ' guest'}`} style={{ '--seal-color': inkStyle[ink].color } as CSSProperties}>
