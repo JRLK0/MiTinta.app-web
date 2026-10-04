@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Check, ChevronDown, Copy, Download, Eye, Gem, Search, Sparkles, X } from 'lucide-react'
 import type { CollectionEntry } from './App'
+import { LiquidSetProgress } from './LiquidSetProgress'
 import { CardViewer, type AddCopy, type OwnershipForCard, type ViewerCard } from './CardViewer'
 import { cardPrice, cardTitle, loadCatalog, type CatalogCard } from './catalog'
 import { CARDMARKET_OPTIONAL_RARITIES, cardmarketWantsChunks, cardmarketWantsText, collectionQuantitiesByPrinting, compareCollectorNumbers, filterCardmarketWants, printingKey, safeSetFileName, type CardFinishQuantities, type CardmarketOptionalRarity } from './setCollection'
@@ -161,7 +162,7 @@ export function SetCollectionView({ entries, ownershipForCard, onAddCopy }: { en
       </div>
     </header>
     <div className="set-ledger">
-      {visibleSets.map((set) => {
+      {visibleSets.map((set, index) => {
         const basePercent = percent(set.ownedIds.size, set.cards.length)
         const masterPercent = percent(set.masterOwned, set.masterTotal)
         const missing = set.cards.filter((card) => !set.ownedIds.has(card.id))
@@ -175,8 +176,8 @@ export function SetCollectionView({ entries, ownershipForCard, onAddCopy }: { en
           <button className="set-summary" onClick={() => setExpanded(isExpanded ? null : set.code)} aria-expanded={isExpanded}>
             <span className="set-index">{set.code}</span>
             <span className="set-identity"><strong>{set.name}</strong><small>{set.ownedIds.size ? `${set.ownedIds.size} de ${set.cards.length} cartas` : 'Sin empezar'}</small></span>
-            <span className="set-progress primary"><i><b style={{ width: `${basePercent}%` }} /></i><span><em>Colección</em><strong>{basePercent}%</strong></span></span>
-            <span className="set-progress master"><i><b style={{ width: `${masterPercent}%` }} /></i><span><em>Master set</em><strong>{masterPercent}%</strong></span></span>
+            <LiquidSetProgress value={basePercent} label="Colección" variant="primary" phase={index} />
+            <LiquidSetProgress value={masterPercent} label="Master set" variant="master" phase={index + 3} />
             <span className={`set-missing${missing.length === 0 ? ' complete' : ''}`}>{missing.length === 0 ? <><Check />Completo</> : <>{missing.length}<small>faltan</small></>}</span>
             <ChevronDown className="set-chevron" aria-hidden="true" />
           </button>
