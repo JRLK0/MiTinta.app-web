@@ -236,7 +236,7 @@ export function DeckStudio({ session, collection, ownershipForCard, onAddCopy }:
       entries: (data ?? []) as DeckEntry[],
     }, true)
     setMessage('')
-    setScreen(deck.format ? 'editor' : 'format')
+    setScreen('editor')
     setMobilePane('catalog')
   }
 
@@ -442,7 +442,7 @@ export function DeckStudio({ session, collection, ownershipForCard, onAddCopy }:
 
   if (screen === 'library') return <section className="deck-library-page" aria-label="Mis mazos">
     <header className="deck-library-header"><div><h1>Mis mazos</h1><p>Elige un mazo para verlo y editarlo.</p></div><button className="save-command" onClick={newDeck}><Plus />Nuevo mazo</button></header>
-    {isDirty && <div className="deck-resume"><div><strong>{name}</strong><span>Tienes un borrador sin guardar.</span></div><button onClick={() => setScreen(format ? 'editor' : 'format')}>Continuar borrador<ArrowRight /></button></div>}
+    {isDirty && <div className="deck-resume"><div><strong>{name}</strong><span>Tienes un borrador sin guardar.</span></div><button onClick={() => setScreen(activeId || format ? 'editor' : 'format')}>Continuar borrador<ArrowRight /></button></div>}
     {message && <p className="notice" role="status">{message}</p>}
     {libraryError && <div className="notice error" role="alert">No se pudieron cargar todos los datos: {libraryError}<button onClick={() => void loadDecks()}>Reintentar</button></div>}
     {libraryLoading ? <p className="deck-library-loading" role="status">Cargando tus mazos…</p> : decks.length ? <div className="deck-library-grid">{decks.map(deck => {
@@ -456,7 +456,7 @@ export function DeckStudio({ session, collection, ownershipForCard, onAddCopy }:
 
   if (screen === 'format') return <section className="deck-format-page">
     <button className="deck-back" onClick={() => setScreen('library')}><ArrowLeft />Mis mazos</button>
-    <div className="deck-format-intro"><h1>{activeId ? 'Elige el formato del mazo' : '¿Qué formato quieres construir?'}</h1><p>El formato determina qué cartas puedes añadir. Podrás cambiarlo en el editor.</p></div>
+    <div className="deck-format-intro"><h1>¿Qué formato quieres construir?</h1><p>El formato determina qué cartas puedes añadir. Podrás cambiarlo en el editor.</p></div>
     <div className="deck-format-choices"><button onClick={() => chooseFormat('core')}><span>Core</span><p>Construye con las ediciones vigentes y las reimpresiones válidas.</p><strong>Crear en Core<ArrowRight /></strong></button><button onClick={() => chooseFormat('infinity')}><span>Infinity</span><p>Construye con cartas de todos los sets, respetando la lista de prohibidas.</p><strong>Crear en Infinity<ArrowRight /></strong></button></div>
   </section>
 
