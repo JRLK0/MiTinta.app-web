@@ -1682,3 +1682,8 @@ button:disabled { cursor: not-allowed; }
 :root[data-theme="dark"] .deck-table tr.missing { background: var(--danger-soft); }
 :root[data-theme="dark"] .deck-list > button:hover { background: var(--surface-raised); }
 :root[data-theme="dark"] .cost-symbol img, :root[data-theme="dark"] .cost-filter-scroll button.active .cost-symbol img { filter: none; }
+
+.catalog-preview-note { margin: 0 0 20px; color: var(--muted); font-size: 13px; line-height: 1.6; }
+.catalog-pending-image { position: relative; aspect-ratio: 63/88; display: grid; place-items: center; border: 1px dashed var(--line-bright); border-radius: 10px; background: var(--surface-raised); color: var(--muted); font-size: 64px; font-weight: 300; }
+.catalog-pending-image small { position: absolute; bottom: 16px; font-size: 13px; color: var(--muted); }
+.catalog-grid .catalog-pending h2 { color: var(--muted); }
