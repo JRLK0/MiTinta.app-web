@@ -1,3 +1,4 @@
+import { collectionCopyTarget } from './collectionCopyTarget'
 import { ThemeToggle } from '../../shared/ThemeToggle'
 import { CSSProperties, FormEvent, useEffect, useMemo, useRef, useState } from 'react'
 import type { Session } from '@supabase/supabase-js'
@@ -483,30 +484,35 @@ function CollectionDashboard({ session }: { session: Session }) {
     }
   }
 
-  const addCopy: AddCopy = async (card, requestedFinish) => {
-    if (!card.id || !card.setCode || !card.collectorNumber) throw new Error('Faltan datos para añadir esta carta.')
+  const addCopy: AddCopy = async (card, requestedFinish, delta = 1) => {
+    if (!card.id || !card.setCode || !card.collectorNumber) throw new Error('Faltan datos para actualizar esta carta.')
     const source = catalogById.get(card.id)
     const finish = effectiveCardFinish(source?.rarity ?? card.rarity, requestedFinish)
-    const language = card.language ?? 'en'
-    const identity = { card_id: card.id, language, finish }
+    const identity = collectionCopyTarget(entries, card, finish, delta)
+    if (!identity) { await loadCollection(); throw new Error('No quedan copias de este acabado para restar.') }
+    const { language } = identity
     const { data: existing, error: readError } = await supabase
       .from('collection_entries')
       .select('quantity')
       .eq('user_id', session.user.id)
-      .eq('card_id', card.id)
+      .eq('card_id', identity.card_id)
       .eq('language', language)
-      .eq('finish', finish)
+      .eq('finish', identity.finish)
       .maybeSingle()
     if (readError) throw readError
-    const quantity = (existing?.quantity ?? 0) + 1
+    if (delta === -1 && (!existing || existing.quantity <= 0)) {
+      await loadCollection()
+      throw new Error('No quedan copias de este acabado para restar.')
+    }
+    const quantity = Math.max(0, (existing?.quantity ?? 0) + delta)
     const key = collectionEntryKey(identity)
     localQuantityUpdates.current.set(key, quantity)
     const { error: writeError } = existing
       ? await supabase.from('collection_entries').update({ quantity })
         .eq('user_id', session.user.id)
-        .eq('card_id', card.id)
+        .eq('card_id', identity.card_id)
         .eq('language', language)
-        .eq('finish', finish)
+        .eq('finish', identity.finish)
       : await supabase.from('collection_entries').insert({
         user_id: session.user.id,
         ...identity,

@@ -1,0 +1,12 @@
+.viewer-quantity-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding-top: 16px; border-top: 1px solid var(--line); }
+.viewer-quantity-row > span { color: var(--muted); font-size: 13px; line-height: 1.5; }
+.viewer-quantity-stepper { display: grid; grid-template-columns: 44px minmax(36px, auto) 44px; align-items: center; gap: 4px; flex-shrink: 0; }
+.viewer-quantity-stepper button { display: grid; place-items: center; width: 44px; height: 44px; padding: 0; border: 0; border-radius: 10px; color: var(--ink); background: var(--surface-raised); }
+.viewer-quantity-stepper button:hover:not(:disabled) { background: var(--accent-soft); color: var(--accent); }
+.viewer-quantity-stepper button.increment { color: var(--on-accent); background: var(--accent); }
+.viewer-quantity-stepper button.increment:hover:not(:disabled) { background: var(--accent-hover); color: var(--on-accent); }
+.viewer-quantity-stepper button:disabled { opacity: .4; cursor: default; }
+.viewer-quantity-stepper button:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+.viewer-quantity-stepper svg { width: 18px; height: 18px; }
+.viewer-quantity-stepper output { text-align: center; color: var(--ink); font-size: 20px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.viewer-finish button:disabled, .viewer-printings button:disabled { cursor: wait; }

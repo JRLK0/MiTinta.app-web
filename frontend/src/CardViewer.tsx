@@ -1,9 +1,10 @@
 import { CSSProperties, PointerEvent, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { Check, Gem, Move3D, Plus, X } from 'lucide-react'
+import { Check, Gem, Minus, Move3D, Plus, X } from 'lucide-react'
 import { FoilProfile, foilHasTopLayer, foilMaskUrls, foilProfileFor } from './foilEffect'
 import { deviceTiltFromOrientation } from './cardMotion'
 import { isFoilOnlyRarity } from './catalog'
+import './cardQuantity.css'
 
 export type ViewerCard = {
   id?: string
@@ -22,7 +23,7 @@ export type ViewerCard = {
   language?: string
 }
 
-export type AddCopy = (card: ViewerCard, finish: 'NORMAL' | 'FOIL') => Promise<void>
+export type AddCopy = (card: ViewerCard, finish: 'NORMAL' | 'FOIL', delta?: 1 | -1) => Promise<void>
 export type OwnershipForCard = (card: ViewerCard) => { normal: number; foil: number }
 
 type CardViewerProps = {
@@ -83,29 +84,29 @@ export function CardViewer({ card, foil = false, canToggleFoil = false, printing
   const hasSatinOverlay = satinOverlayProfiles.has(foilProfile)
   const owned = ownershipForCard?.(activeCard) ?? { normal: activeCard.normalQuantity ?? 0, foil: activeCard.foilQuantity ?? 0 }
   const showOwnership = Boolean(ownershipForCard || onAddCopy || activeCard.normalQuantity != null || activeCard.foilQuantity != null)
-  const finishes = isSpecial ? ['FOIL'] as const : canShowFoil || owned.foil > 0 || foil ? ['NORMAL', 'FOIL'] as const : ['NORMAL'] as const
+  const finishes = isSpecial ? ['FOIL'] as const : onAddCopy || canShowFoil || owned.foil > 0 || foil ? ['NORMAL', 'FOIL'] as const : ['NORMAL'] as const
 
   useEffect(() => {
     setActiveCard(card)
     setFoilMode(foil)
-  }, [card, foil])
+  }, [card.id, card.setCode, card.collectorNumber, foil])
 
   useEffect(() => {
     setAddMessage('')
     setAddError('')
   }, [activeCard.id, activeCard.setCode, activeCard.collectorNumber, foilMode])
 
-  async function addCopy() {
+  async function changeCopy(delta: 1 | -1) {
     if (!onAddCopy || !activeCard.id || adding) return
     const finish = effectiveFoilMode ? 'FOIL' : 'NORMAL'
     setAdding(true)
     setAddMessage('')
     setAddError('')
     try {
-      await onAddCopy(activeCard, finish)
-      setAddMessage(`1 copia ${finish === 'FOIL' ? 'foil' : 'normal'} añadida a tu colección`)
+      await onAddCopy(activeCard, finish, delta)
+      setAddMessage(`1 copia ${finish === 'FOIL' ? 'foil' : 'normal'} ${delta === 1 ? 'añadida a' : 'retirada de'} tu colección`)
     } catch (error) {
-      setAddError(error instanceof Error ? error.message : 'No se pudo añadir la copia.')
+      setAddError(error instanceof Error ? error.message : 'No se pudo actualizar la cantidad.')
     } finally {
       setAdding(false)
     }
@@ -332,6 +333,7 @@ export function CardViewer({ card, foil = false, canToggleFoil = false, printing
                   className={selected ? 'active' : ''}
                   aria-pressed={selected}
                   aria-label={showOwnership ? `${name}, ${quantity} ${quantity === 1 ? 'copia' : 'copias'} en tu colección` : name}
+                  disabled={adding}
                   onClick={() => setFoilMode(isFoil)}
                 >{content}</button> : <span key={finish} className="viewer-finish-only">{content}</span>
               })}
@@ -344,9 +346,10 @@ export function CardViewer({ card, foil = false, canToggleFoil = false, printing
               return <button
                 key={printing.id ?? `${printing.setCode}-${printing.collectorNumber}`}
                 className={active ? 'active' : ''}
+                disabled={adding}
                 onClick={() => setActiveCard(printing)}
-                onPointerEnter={(event) => { if (event.pointerType === 'mouse') setActiveCard(printing) }}
-                onFocus={() => setActiveCard(printing)}
+                onPointerEnter={(event) => { if (!adding && event.pointerType === 'mouse') setActiveCard(printing) }}
+                onFocus={() => { if (!adding) setActiveCard(printing) }}
                 aria-pressed={active}
                 title={`${printing.setCode} · ${printing.setName ?? 'Lorcana'} · #${printing.collectorNumber}`}
               >
@@ -362,9 +365,12 @@ export function CardViewer({ card, foil = false, canToggleFoil = false, printing
           </div>
           <strong className="viewer-price">{price == null ? 'Sin precio' : price.toLocaleString('es-ES', { style: 'currency', currency: 'EUR' })}</strong>
           {onAddCopy && <div className="viewer-add">
-            <button type="button" className="viewer-add-copy" onClick={() => void addCopy()} disabled={adding || !activeCard.id}>
-              <Plus aria-hidden="true" />{adding ? 'Añadiendo…' : `Añadir 1 ${effectiveFoilMode ? 'foil' : 'normal'} a mi colección`}
-            </button>
+            <div className="viewer-quantity-row"><span>{effectiveFoilMode ? 'Foil' : 'Normal'} en tu colección</span><div className="viewer-quantity-stepper" role="group" aria-label={`Cantidad ${effectiveFoilMode ? 'foil' : 'normal'} en tu colección`} aria-busy={adding}>
+              <button type="button" onClick={() => void changeCopy(-1)} disabled={adding || !activeCard.id || (effectiveFoilMode ? owned.foil : owned.normal) === 0} aria-label={`Restar una copia ${effectiveFoilMode ? 'foil' : 'normal'}`}><Minus aria-hidden="true" /></button>
+              <output aria-label="Cantidad en tu colección">{effectiveFoilMode ? owned.foil : owned.normal}</output>
+              <button type="button" className="increment" onClick={() => void changeCopy(1)} disabled={adding || !activeCard.id} aria-label={`Añadir una copia ${effectiveFoilMode ? 'foil' : 'normal'}`}><Plus aria-hidden="true" /></button>
+            </div></div>
+            {adding && <p className="viewer-add-message" role="status">Actualizando cantidad…</p>}
             {addMessage && <p className="viewer-add-message" role="status">{addMessage}</p>}
             {addError && <p className="viewer-add-error" role="alert">{addError}</p>}
           </div>}
