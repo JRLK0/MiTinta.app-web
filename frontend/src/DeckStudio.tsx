@@ -4,7 +4,7 @@ import { availableDeckCatalog } from './deckCatalog'
 import { DeckInkCrest } from './DeckInkCrest'
 import { allowsDeckInk, changeDeckCopies, deckCopyState, deckInkPolicy, validateDeck } from './deckRules'
 import { ThemeToggle } from '../../shared/ThemeToggle'
-import { ChangeEvent, useEffect, useMemo, useState } from 'react'
+import { ChangeEvent, useEffect, useMemo, useRef, useState } from 'react'
 import type { Session } from '@supabase/supabase-js'
 import {
   BarChart3, BookOpen, CheckCircle2, ChevronDown, CircleAlert, ClipboardPaste, Download, Eye, EyeOff,
@@ -91,6 +91,7 @@ function DeckAnalysis({ entries, publicView = false }: { entries: DeckAnalyticsE
 }
 
 export function DeckStudio({ session, collection, ownershipForCard, onAddCopy }: { session: Session; collection: OwnedCard[]; ownershipForCard: OwnershipForCard; onAddCopy: AddCopy }) {
+  const workspace = useRef<HTMLElement>(null)
   const draftKey = `lorcana-deck-draft:${session.user.id}`
   const restoredDraft = useMemo(
     () => parseDeckDraft(window.localStorage.getItem(draftKey), session.user.id),
@@ -118,6 +119,7 @@ export function DeckStudio({ session, collection, ownershipForCard, onAddCopy }:
   const [importError, setImportError] = useState('')
   const [readingClipboard, setReadingClipboard] = useState(false)
   const [analysisOpen, setAnalysisOpen] = useState(false)
+  const [mobilePane, setMobilePane] = useState<'catalog' | 'list'>('catalog')
   const [selectedCard, setSelectedCard] = useState<ViewerCard | null>(null)
 
   const editorState = useMemo<DeckEditorState>(
@@ -161,6 +163,22 @@ export function DeckStudio({ session, collection, ownershipForCard, onAddCopy }:
     window.addEventListener('keydown', closeOnEscape)
     return () => window.removeEventListener('keydown', closeOnEscape)
   }, [importOpen])
+
+  useEffect(() => {
+    const closePanels = (event: PointerEvent | KeyboardEvent) => {
+      const escape = event instanceof KeyboardEvent && event.key === 'Escape'
+      if (event instanceof KeyboardEvent && !escape) return
+      workspace.current?.querySelectorAll<HTMLDetailsElement>('.deck-options[open], .deck-insights[open]').forEach(panel => {
+        if (escape || !panel.contains(event.target as Node)) {
+          panel.open = false
+          if (escape && panel.contains(document.activeElement)) panel.querySelector<HTMLElement>('summary')?.focus()
+        }
+      })
+    }
+    document.addEventListener('pointerdown', closePanels)
+    document.addEventListener('keydown', closePanels)
+    return () => { document.removeEventListener('pointerdown', closePanels); document.removeEventListener('keydown', closePanels) }
+  }, [])
 
   function applyEditor(next: DeckEditorState, saved: boolean) {
     setActiveId(next.activeId)
@@ -393,31 +411,32 @@ export function DeckStudio({ session, collection, ownershipForCard, onAddCopy }:
   const priceSummary = useMemo(() => buildDeckPriceSummary(collection, entries), [collection, entries])
 
   return (
-    <section className="studio-shell deck-workspace">
-      <aside className="deck-library">
+    <section ref={workspace} className="studio-shell deck-workspace">
+      <details className="deck-library"><summary><BookOpen />Tus mazos<ChevronDown /></summary><aside>
         <div className="panel-heading"><div><span>Biblioteca</span><h2>Tus mazos</h2></div><button className="new-deck-command" onClick={newDeck}><Plus />Nuevo</button></div>
         <div className="deck-list">
           {decks.map((deck) => <button key={deck.id} className={activeId === deck.id ? 'active' : ''} onClick={() => void openDeck(deck)}><strong>{deck.name}</strong><span>{deck.format && `${formatName(deck.format)} · `}{deck.is_public ? <><Eye /> Público</> : <><EyeOff /> Privado</>}</span></button>)}
           {decks.length === 0 && <p className="panel-empty">Aún no has guardado ningún mazo.</p>}
         </div>
-      </aside>
+      </aside></details>
 
       <div className="deck-editor">
         <div className="deck-editor-head">
-          <div className="deck-fields"><input className="deck-title-input" value={name} onChange={(event) => setName(event.target.value)} maxLength={80} aria-label="Nombre del mazo" /><input value={description} onChange={(event) => setDescription(event.target.value)} maxLength={1000} placeholder="Añade una descripción…" aria-label="Descripción del mazo" /><span className={`deck-save-state${isDirty ? ' dirty' : ''}`}>{isDirty ? 'Cambios sin guardar' : 'Guardado'}</span></div>
+          <div className="deck-fields"><input className="deck-title-input" value={name} onChange={(event) => setName(event.target.value)} maxLength={80} aria-label="Nombre del mazo" /><span className={`deck-save-state${isDirty ? ' dirty' : ''}`}>{isDirty ? 'Cambios sin guardar' : 'Guardado'}</span></div>
           <div className="deck-commands">
-            <button className="import-command" onClick={openImporter}><FileUp />Importar mazo</button>
-            <button className="icon-command" onClick={downloadDeck} disabled={entries.length === 0} title="Exportar mazo" aria-label="Exportar mazo"><Download /></button>
-            <button className={`icon-command${isPublic ? ' active' : ''}`} onClick={() => setIsPublic((value) => !value)} title={isPublic ? 'Hacer privado' : 'Hacer público'} aria-label={isPublic ? 'Hacer privado' : 'Hacer público'}>{isPublic ? <Eye /> : <EyeOff />}</button>
-            {activeId && isPublic && <button className="icon-command" onClick={() => void copyShareLink()} title="Copiar enlace" aria-label="Copiar enlace"><Link2 /></button>}
-            {activeId && <button className="icon-command danger" onClick={() => void deleteDeck()} title="Eliminar mazo" aria-label="Eliminar mazo"><Trash2 /></button>}
+            <button className="import-command" onClick={openImporter}><FileUp />Importar</button>
+            <details className="deck-options"><summary>Opciones<ChevronDown /></summary><div className="deck-options-panel"><label>Descripción<input value={description} onChange={(event) => setDescription(event.target.value)} maxLength={1000} placeholder="Añade una descripción…" /></label>            <button className="icon-command" onClick={downloadDeck} disabled={entries.length === 0} title="Exportar mazo" aria-label="Exportar mazo"><Download />Exportar lista</button>
+            <button className={`icon-command${isPublic ? ' active' : ''}`} onClick={() => setIsPublic((value) => !value)} title={isPublic ? 'Hacer privado' : 'Hacer público'} aria-label={isPublic ? 'Hacer privado' : 'Hacer público'}>{isPublic ? <Eye /> : <EyeOff />}{isPublic ? 'Hacer privado' : 'Hacer público'}</button>
+            {activeId && isPublic && <button className="icon-command" onClick={() => void copyShareLink()} title="Copiar enlace" aria-label="Copiar enlace"><Link2 />Copiar enlace</button>}
+            {activeId && <button className="icon-command danger" onClick={() => void deleteDeck()} title="Eliminar mazo" aria-label="Eliminar mazo"><Trash2 />Eliminar mazo</button>}
+</div></details>
             <button className="save-command" onClick={() => void saveDeck()} disabled={saving}><Save />{saving ? 'Guardando' : 'Guardar'}</button>
           </div>
         </div>
-        <FormatSelector value={format} onChange={setFormat} />
-        {message && <p className="studio-message">{message}<button onClick={() => setMessage('')} aria-label="Cerrar mensaje"><X /></button></p>}
+        <div className="deck-build-toolbar"><FormatSelector value={format} onChange={setFormat} /><span className="deck-total"><strong>{rules.total}</strong> / 60 cartas</span><details className="deck-insights"><summary>Detalles<ChevronDown /></summary><div className="deck-insights-panel">
+
         <div className="deck-overview" aria-label="Estado del mazo">
-          <div className="deck-progress-card"><span>Construcción</span><strong>{rules.total}<small>/60</small></strong><div className="deck-progress-track"><i style={{ width: `${Math.min(100, (rules.total / 60) * 100)}%` }} /></div></div>
+
           <div className={`ownership-summary${missing > 0 ? ' incomplete' : ''}`}>
             <span>{missing > 0 ? 'Colección incompleta' : 'Copias completas'}</span>
             <strong>{ownedInDeck} de {rules.total}</strong>
@@ -436,8 +455,24 @@ export function DeckStudio({ session, collection, ownershipForCard, onAddCopy }:
           <button className={`analysis-toggle${analysisOpen ? ' open' : ''}`} onClick={() => setAnalysisOpen((value) => !value)} aria-expanded={analysisOpen}><BarChart3 />Análisis<ChevronDown /></button>
         </div>
         {analysisOpen && <DeckAnalysis entries={entries} />}
+        </div></details></div>
+        {message && <p className="studio-message">{message}<button onClick={() => setMessage('')} aria-label="Cerrar mensaje"><X /></button></p>}
 
-        <div className="deck-canvas">
+        <div className="deck-mobile-panes" role="group" aria-label="Zona de construcción"><button aria-pressed={mobilePane === 'catalog'} onClick={() => setMobilePane('catalog')}>Añadir cartas</button><button aria-pressed={mobilePane === 'list'} onClick={() => setMobilePane('list')}>Tu lista · {rules.total}</button></div>
+        <div className={`deck-canvas pane-${mobilePane}`}>
+          <div className="catalog-picker">
+            <div className="catalog-picker-heading"><div><h3>Añadir cartas</h3></div><p><i className="legend-owned" />En tu colección <i className="legend-missing" />No disponible</p></div>
+            {catalogScope && <p className="deck-catalog-scope">{catalogScope}</p>}
+            <CardFilterBar compact cards={filterableCatalog} filters={filters} onFiltersChange={setFilters} sort={sort} sortOptions={COMMON_SORT_OPTIONS} onSortChange={(value) => setSort(value as CommonSortMode)} resultCount={matchingCatalog.length} totalCount={eligibleCatalog.length} extraActiveCount={onlyAvailable ? 1 : 0} extraActiveLabel="Solo disponibles" onReset={() => setOnlyAvailable(false)} specificControls={<div className="specific-filter-control"><span>Colección propia</span><div><button className={!onlyAvailable ? 'active' : ''} onClick={() => setOnlyAvailable(false)}>Todas</button><button className={onlyAvailable ? 'active' : ''} onClick={() => setOnlyAvailable(true)}>Solo disponibles</button></div></div>} />
+            {matchingCatalog.length > 120 && <p className="deck-catalog-scope">Mostrando las primeras 120 cartas. Afina la búsqueda para ver el resto.</p>}{!loadingCatalog && !catalogError && matchingCatalog.length === 0 && <p className="picker-loading">No hay cartas compatibles con el formato, las tintas y los filtros elegidos.</p>}{catalogError && <p className="notice error">{catalogError}</p>}
+            {loadingCatalog ? <p className="picker-loading">Descargando catálogo…</p> : <div className="picker-grid">{visibleCatalog.map((card) => {
+              const cardAvailability = availability.get(deckAvailabilityKey(card.name, card.version)) ?? { owned: 0, required: 0, remaining: 0, missing: 0 }
+              const copyState = deckCopyState(entries, entryFromCard(card))
+              const legality = formatReady ? checkFormat(entryFromCard(card)) : null
+              const ownership = cardAvailability.remaining > 0 ? 'available' : cardAvailability.owned > 0 ? 'used' : 'unowned'
+              return <article key={card.id} className={`picker-card ownership-${ownership}`}><div className={`ownership-badge ${ownership}`}>{ownership === 'available' ? <><CheckCircle2 />Tienes {cardAvailability.remaining} disponible{cardAvailability.remaining === 1 ? '' : 's'}</> : ownership === 'used' ? 'Copias ya usadas' : 'No la tienes'}</div><button className="picker-preview" onClick={() => setSelectedCard({ id: card.id, name: card.name, version: card.version, imageUrl: card.image_url, setCode: card.set_code, setName: card.set_name, collectorNumber: card.collector_number, rarity: card.rarity, ink: card.ink, normalPriceEur: card.normal_price_eur, foilPriceEur: card.foil_price_eur })} aria-label={`Ver ${cardTitle(card)}`}>{card.image_url ? <img src={card.image_url} alt={cardTitle(card)} loading="lazy" /> : <span className="deck-thumb"><Sparkles /></span>}</button><button disabled={!copyState.canAdd} onClick={() => changeCard(card, 1)} title={copyState.canAdd ? `Añadir ${cardTitle(card)}` : `Máximo ${copyState.limit} copias entre todas las ediciones`} aria-label={`Añadir ${cardTitle(card)}`}><Plus /></button><div><strong>{card.name}</strong><span>{card.version}</span>{legality && !legality.legal && <small className="picker-format-warning" title={legality.message}>{legality.kind === 'banned' ? 'Prohibida' : legality.kind === 'unreleased' ? 'Pendiente de lanzamiento' : `Fuera de ${formatName(format!)}`}</small>}<small className={`deck-copy-count${!copyState.canAdd ? ' at-limit' : ''}`}>{copyState.count}/{Number.isFinite(copyState.limit) ? copyState.limit : '∞'} en el mazo{!copyState.canAdd ? ' · Máximo' : ''}</small></div></article>
+            })}</div>}
+          </div>
           <div className="deck-stack">
             <div className="section-title"><div><h3>Tu lista</h3><span>{entries.length} cartas distintas</span></div><DeckInkCrest inks={rules.inks} baseInks={rules.baseInks} invalid={!rules.inksValid} /></div>
             <div className={`deck-construction-status${rules.valid && formatReady && !formatIssues.length ? '' : ' bad'}`} aria-live="polite"><p>{rules.valid && formatReady && !formatIssues.length ? `Mazo válido para ${formatName(format!)} · 60 cartas o más` : [!format ? 'Elige Core o Infinity.' : '', ...rules.issues, ...(formatIssues.length ? [`${formatIssues.length} ${formatIssues.length === 1 ? 'carta fuera' : 'cartas fuera'} de ${formatName(format!)}. Revisa los avisos de la lista.`] : [])].filter(Boolean).join(' ')}</p>{rules.hunnyEnabled && <p>Christopher Robin: base Amatista/Zafiro; otras tintas solo en personajes Hunny.</p>}</div>
@@ -459,19 +494,6 @@ export function DeckStudio({ session, collection, ownershipForCard, onAddCopy }:
             </div>
           </div>
 
-          <div className="catalog-picker">
-            <div className="catalog-picker-heading"><div><span>Explorar</span><h3>Añadir cartas</h3></div><p><i className="legend-owned" />En tu colección <i className="legend-missing" />No disponible</p></div>
-            {catalogScope && <p className="deck-catalog-scope">{catalogScope}</p>}
-            <CardFilterBar compact cards={filterableCatalog} filters={filters} onFiltersChange={setFilters} sort={sort} sortOptions={COMMON_SORT_OPTIONS} onSortChange={(value) => setSort(value as CommonSortMode)} resultCount={matchingCatalog.length} totalCount={eligibleCatalog.length} extraActiveCount={onlyAvailable ? 1 : 0} extraActiveLabel="Solo disponibles" onReset={() => setOnlyAvailable(false)} specificControls={<div className="specific-filter-control"><span>Colección propia</span><div><button className={!onlyAvailable ? 'active' : ''} onClick={() => setOnlyAvailable(false)}>Todas</button><button className={onlyAvailable ? 'active' : ''} onClick={() => setOnlyAvailable(true)}>Solo disponibles</button></div></div>} />
-            {matchingCatalog.length > 120 && <p className="deck-catalog-scope">Mostrando las primeras 120 cartas. Afina la búsqueda para ver el resto.</p>}{!loadingCatalog && !catalogError && matchingCatalog.length === 0 && <p className="picker-loading">No hay cartas compatibles con el formato, las tintas y los filtros elegidos.</p>}{catalogError && <p className="notice error">{catalogError}</p>}
-            {loadingCatalog ? <p className="picker-loading">Descargando catálogo…</p> : <div className="picker-grid">{visibleCatalog.map((card) => {
-              const cardAvailability = availability.get(deckAvailabilityKey(card.name, card.version)) ?? { owned: 0, required: 0, remaining: 0, missing: 0 }
-              const copyState = deckCopyState(entries, entryFromCard(card))
-              const legality = formatReady ? checkFormat(entryFromCard(card)) : null
-              const ownership = cardAvailability.remaining > 0 ? 'available' : cardAvailability.owned > 0 ? 'used' : 'unowned'
-              return <article key={card.id} className={`picker-card ownership-${ownership}`}><div className={`ownership-badge ${ownership}`}>{ownership === 'available' ? <><CheckCircle2 />Tienes {cardAvailability.remaining} disponible{cardAvailability.remaining === 1 ? '' : 's'}</> : ownership === 'used' ? 'Copias ya usadas' : 'No la tienes'}</div><button className="picker-preview" onClick={() => setSelectedCard({ id: card.id, name: card.name, version: card.version, imageUrl: card.image_url, setCode: card.set_code, setName: card.set_name, collectorNumber: card.collector_number, rarity: card.rarity, ink: card.ink, normalPriceEur: card.normal_price_eur, foilPriceEur: card.foil_price_eur })} aria-label={`Ver ${cardTitle(card)}`}>{card.image_url ? <img src={card.image_url} alt={cardTitle(card)} loading="lazy" /> : <span className="deck-thumb"><Sparkles /></span>}</button><button disabled={!copyState.canAdd} onClick={() => changeCard(card, 1)} title={copyState.canAdd ? `Añadir ${cardTitle(card)}` : `Máximo ${copyState.limit} copias entre todas las ediciones`} aria-label={`Añadir ${cardTitle(card)}`}><Plus /></button><div><strong>{card.name}</strong><span>{card.version}</span>{legality && !legality.legal && <small className="picker-format-warning" title={legality.message}>{legality.kind === 'banned' ? 'Prohibida' : legality.kind === 'unreleased' ? 'Pendiente de lanzamiento' : `Fuera de ${formatName(format!)}`}</small>}<small className={`deck-copy-count${!copyState.canAdd ? ' at-limit' : ''}`}>{copyState.count}/{Number.isFinite(copyState.limit) ? copyState.limit : '∞'} en el mazo{!copyState.canAdd ? ' · Máximo' : ''}</small></div></article>
-            })}</div>}
-          </div>
         </div>
       </div>
       {importOpen && <div className="deck-modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setImportOpen(false) }}><section className="deck-import-modal" role="dialog" aria-modal="true" aria-labelledby="import-title"><header><div className="modal-icon"><FileUp /></div><div><p className="eyebrow">Añadir una lista</p><h2 id="import-title">Importar mazo</h2></div><button className="modal-close" onClick={() => setImportOpen(false)} aria-label="Cerrar importación"><X /></button></header><p className="import-intro">Pega una lista desde Dreamborn, InkDecks u otra web. También puedes subir un archivo <b>.txt</b> o <b>.csv</b>.</p><FormatSelector value={importFormat} onChange={setImportFormat} /><div className="import-source-actions"><button onClick={() => void pasteFromClipboard()} disabled={readingClipboard}><ClipboardPaste />{readingClipboard ? 'Leyendo…' : 'Pegar del portapapeles'}</button><label><FileUp />Elegir archivo<input type="file" accept=".txt,.csv" onChange={(event) => void importFile(event)} hidden /></label></div><label className="import-text-label"><span>Lista de cartas</span><small>Formato: cantidad + nombre de la carta</small><textarea autoFocus value={importText} onChange={(event) => { setImportText(event.target.value); setImportError('') }} placeholder={'4 Mickey Mouse - Brave Little Tailor\n4 Lumpy - Hunny Druid'} aria-label="Lista para importar" /></label>{importError && <p className="import-error" role="alert"><CircleAlert />{importError}</p>}<div className="import-example"><strong>Ejemplo compatible</strong><code>4 Mickey Mouse - Brave Little Tailor</code></div><footer><span>Al importar, se reemplazará la lista actual.</span><div><button className="cancel-command" onClick={() => setImportOpen(false)}>Cancelar</button><button className="save-command" onClick={submitImport} disabled={!importText.trim() || !importFormat || loadingCatalog || !!catalogError}><FileUp />Importar lista</button></div></footer></section></div>}

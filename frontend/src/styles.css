@@ -1678,3 +1678,84 @@ button:disabled { cursor: not-allowed; }
 .catalog-pending-image { position: relative; aspect-ratio: 63/88; display: grid; place-items: center; border: 1px dashed var(--line-bright); border-radius: 10px; background: var(--surface-raised); color: var(--muted); font-size: 64px; font-weight: 300; }
 .catalog-pending-image small { position: absolute; bottom: 16px; font-size: 13px; color: var(--muted); }
 .catalog-grid .catalog-pending h2 { color: var(--muted); }
+/* Construction: browse on the left, build on the right, details on demand. */
+.deck-workspace { display: block; min-height: 0; overflow: visible; }
+.deck-workspace .deck-library { border: 0; border-bottom: 1px solid var(--line); border-radius: 14px 14px 0 0; background: var(--surface); }
+.deck-library > summary, .deck-options > summary, .deck-insights > summary { display: flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 14px; cursor: pointer; list-style: none; color: var(--ink); font-size: 13px; font-weight: 600; }
+.deck-library > summary::-webkit-details-marker, .deck-options > summary::-webkit-details-marker, .deck-insights > summary::-webkit-details-marker { display: none; }
+.deck-library > summary svg, .deck-options > summary svg, .deck-insights > summary svg { width: 16px; height: 16px; }
+.deck-library > summary svg:last-child { margin-left: auto; }
+.deck-library[open] > summary svg:last-child, .deck-options[open] > summary svg, .deck-insights[open] > summary svg { transform: rotate(180deg); }
+.deck-workspace .deck-library .panel-heading { min-height: 56px; padding: 8px 16px; }
+.deck-library .panel-heading span { display: none; }
+.deck-workspace .deck-library .panel-heading h2 { font-size: 16px; }
+.deck-workspace .deck-list { display: flex; flex-wrap: wrap; max-height: 220px; overflow-y: auto; }
+.deck-workspace .deck-list > button { flex: 0 0 200px; text-align: left; }
+.deck-workspace .deck-editor-head { min-height: 84px; padding: 16px 20px; }
+.deck-options { position: relative; }
+.deck-options > summary, .deck-insights > summary { border-radius: 8px; background: var(--surface-raised); }
+.deck-options-panel { position: absolute; z-index: var(--z-popover); right: 0; top: calc(100% + 8px); width: min(300px, calc(100vw - 64px)); display: grid; gap: 6px; padding: 14px; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; }
+.deck-options-panel label { display: grid; gap: 8px; font-size: 12px; color: var(--muted); }
+.deck-options-panel input { width: 100%; min-height: 44px; padding: 8px; color: var(--ink); background: var(--surface-raised); border: 1px solid var(--line); border-radius: 6px; }
+.deck-workspace .deck-options-panel .icon-command { display: flex; justify-content: flex-start; gap: 10px; width: 100%; height: auto; min-height: 44px; border: 0; padding: 10px; font-size: 13px; background: transparent; }
+.deck-workspace .deck-options-panel .icon-command:hover { background: var(--surface-raised); }
+.deck-workspace .deck-options-panel .icon-command.active { color: var(--accent); }
+.deck-build-toolbar { position: relative; display: flex; flex-wrap: wrap; align-items: center; gap: 12px 20px; padding: 8px 20px; border-bottom: 1px solid var(--line); }
+.deck-build-toolbar .deck-format-selector { padding: 0; }
+.deck-build-toolbar .deck-format-selector > small { display: none; }
+.deck-total { margin-left: auto; color: var(--muted); white-space: nowrap; font-size: 13px; font-variant-numeric: tabular-nums; }
+.deck-total strong { color: var(--ink); font-size: 20px; }
+.deck-insights-panel { position: absolute; z-index: var(--z-popover); left: 0; right: 0; top: 100%; background: var(--surface); border-bottom: 1px solid var(--line); box-shadow: 0 12px 20px rgba(0,0,0,.08); }
+.deck-workspace .deck-overview { grid-template-columns: minmax(180px, .8fr) minmax(0, 1.5fr) auto; }
+.deck-workspace .deck-overview .deck-rule-summary { order: initial; grid-column: auto; }
+.deck-workspace .deck-canvas { grid-template-columns: minmax(0, 1fr) minmax(340px, .62fr); min-height: 580px; }
+.deck-workspace .catalog-picker { background: var(--surface); }
+.deck-workspace .deck-stack { border: 0; border-left: 1px solid var(--line); }
+.deck-workspace .deck-card-rows, .deck-workspace .picker-grid { max-height: 720px; }
+.deck-workspace .section-title, .deck-workspace .catalog-picker-heading { min-height: 64px; }
+.deck-workspace .deck-row.is-missing { background: var(--surface); }
+.deck-workspace .deck-row { min-height: 82px; }
+.deck-workspace .deck-row .deck-edition, .deck-workspace .deck-row .deck-row-price { display: none; }
+.deck-workspace .picker-card.ownership-unowned .picker-preview img { opacity: 1; filter: none; }
+.deck-workspace .picker-card { box-shadow: none; }
+.deck-mobile-panes { display: none; }
+@media (max-width: 900px) {
+  .deck-mobile-panes { display: flex; gap: 8px; padding: 12px 16px; border-bottom: 1px solid var(--line); }
+  .deck-mobile-panes button { flex: 1; min-height: 44px; border: 0; border-radius: 8px; background: var(--surface-raised); color: var(--muted); font-size: 14px; font-weight: 600; }
+  .deck-mobile-panes button[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent); }
+  .deck-workspace .deck-canvas { display: block; min-height: 0; }
+  .deck-canvas.pane-catalog > .deck-stack, .deck-canvas.pane-list > .catalog-picker { display: none; }
+  .deck-workspace .deck-stack { border-left: 0; }
+  .deck-workspace .deck-card-rows, .deck-workspace .picker-grid { max-height: none; }
+  .deck-workspace .deck-overview { grid-template-columns: 1fr auto; }
+  .deck-workspace .deck-overview .deck-rule-summary { grid-column: 1 / -1; }
+  .deck-workspace .deck-overview .analysis-toggle { grid-column: auto; }
+}
+@media (max-width: 600px) {
+  .deck-workspace .deck-editor-head { padding: 14px 16px; gap: 12px; }
+  .deck-workspace .deck-title-input { font-size: 24px; }
+  .deck-workspace .deck-commands { overflow: visible; width: auto; flex-wrap: wrap; padding: 0; }
+  .deck-options-panel { left: 0; right: auto; }
+  .deck-build-toolbar { padding: 12px 16px; gap: 8px; }
+  .deck-build-toolbar .deck-format-selector { gap: 8px; }
+  .deck-build-toolbar .deck-format-selector button { padding-inline: 12px; }
+  .deck-total { font-size: 12px; }
+  .deck-insights { margin-left: auto; }
+  .deck-workspace .catalog-picker-heading > p { display: none; }
+}
+/* Shared navigation stays in the same place across collection, catalogue and decks. */
+.topbar .desktop-view-tabs { flex: 1; justify-content: center; gap: 12px; margin: 0; border: 0; }
+.topbar .desktop-view-tabs button { min-height: 44px; border: 0; border-radius: 8px; padding-inline: 16px; }
+.topbar .desktop-view-tabs button.active { background: var(--accent-soft); color: var(--accent); }
+.view-navigation { border-bottom: 0; justify-content: flex-end; margin-bottom: 16px; }
+@media (max-width: 720px) { .topbar .desktop-view-tabs { display: none; } }
+@media (max-width: 600px) {
+  .deck-workspace .deck-commands { gap: 6px; }
+  .deck-workspace .import-command { padding-inline: 10px; }
+  .deck-options > summary { padding-inline: 10px; }
+  .deck-build-toolbar .deck-format-selector > span { display: none; }
+  .deck-insights > summary { padding-inline: 10px; }
+  .deck-workspace .catalog-picker-heading { min-height: 52px; }
+}
+.deck-options:not([open]) > .deck-options-panel, .deck-insights:not([open]) > .deck-insights-panel { display: none; }
+.deck-workspace .deck-stack .section-title { overflow: hidden; }

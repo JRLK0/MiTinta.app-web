@@ -551,6 +551,11 @@ function CollectionDashboard({ session }: { session: Session }) {
           <span className="brand-mark"><img src={`${import.meta.env.BASE_URL}ink-icons/amethyst.png`} alt="" width="30" height="30" /></span>
           <div><span className="app-brand-name">MiTinta</span><strong className="current-view-label">{activeViewLabel}<i title="Sincronización activa" aria-label="Sincronización activa" /></strong></div>
         </div>
+          <nav className="view-tabs desktop-view-tabs" aria-label="Vistas de la cuenta">
+            <button className={activeView === 'collection' ? 'active' : ''} onClick={() => setActiveView('collection')}><Layers3 aria-hidden="true" />Colección</button>
+            <button className={activeView === 'catalog' ? 'active' : ''} onClick={() => setActiveView('catalog')}><LibraryBig aria-hidden="true" />Catálogo</button>
+            <button className={activeView === 'decks' ? 'active' : ''} onClick={() => setActiveView('decks')}><ListChecks aria-hidden="true" />Mazos</button>
+          </nav>
         <div className="header-actions"><ThemeToggle /><AccountMenu
           email={session.user.email ?? ''}
           soundEnabled={soundEnabled}
@@ -565,16 +570,12 @@ function CollectionDashboard({ session }: { session: Session }) {
       </header>
 
       <main className={`collection-main view-${activeView}`}>
-        <section className="view-navigation">
-          <nav className="view-tabs" aria-label="Vistas de la cuenta">
-            <button className={activeView === 'collection' ? 'active' : ''} onClick={() => setActiveView('collection')}><Layers3 aria-hidden="true" />Colección</button>
-            <button className={activeView === 'catalog' ? 'active' : ''} onClick={() => setActiveView('catalog')}><LibraryBig aria-hidden="true" />Catálogo</button>
-            <button className={activeView === 'decks' ? 'active' : ''} onClick={() => setActiveView('decks')}><ListChecks aria-hidden="true" />Mazos</button>
-          </nav>
+        {activeView === 'collection' && <section className="view-navigation">
+
           {activeView === 'collection' && <CollectionActions canImport={catalogMetadata.length > 0} canExport={entries.length > 0}
             onImport={() => { setStarterImportMessage(''); setStarterImporterOpen(true) }} onExport={downloadDreambornCsv} />}
 
-        </section>
+        </section>}
 
         {error && <p className="notice error">No se pudo actualizar la colección: {error}</p>}
         {activeView === 'collection' && starterImportMessage && <p className="notice success" role="status">{starterImportMessage}</p>}

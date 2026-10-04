@@ -23,3 +23,5 @@ La web usa un tema claro, tipografía de sistema y un acento amatista. Los filtr
 El selector claro/oscuro comparte `frontend/public/theme.js` y `theme.css`, con paletas en `shared/tokens.css`. Guarda `mitinta-theme` en localStorage y sincroniza pestañas; el tema claro es el predeterminado.
 
 El catálogo reserva 242 números para Hyperia City (total previsto). Los números ausentes aparecen con ? y no se pueden añadir a la colección ni a los mazos. Los huecos se sustituyen automáticamente cuando el catálogo incorpora sus cartas.
+
+El constructor separa el catálogo (izquierda) de la lista (derecha). En móvil se alternan con Añadir cartas / Tu lista. Tus mazos, Opciones y Detalles agrupan biblioteca, descripción, privacidad, exportación, disponibilidad, precios y análisis; formato, cantidades y avisos siguen accesibles durante la construcción. La navegación de Colección, Catálogo y Mazos comparte la cabecera en escritorio y la barra inferior en móvil.
