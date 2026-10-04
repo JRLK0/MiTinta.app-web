@@ -27,13 +27,15 @@ export function LiquidSetProgress({ value, label, variant, phase }: {
 
   return <span ref={ref} className={`set-progress ${variant} liquid-progress${visible && pageVisible && progress > 0 ? ' flowing' : ''}`} style={{ '--ink-phase': `${-phase * 0.73}s` } as CSSProperties}>
     <span className="liquid-progress-track" aria-hidden="true">
-      <span className="liquid-progress-fill" style={{ width: `${progress}%` }}>
-        {[0, 1, 2].map(orbit => <span key={orbit} className="liquid-progress-orbit" style={{ '--orbit-offset': `${-orbit * 2.4}s` } as CSSProperties}>
-          <svg viewBox="0 0 240 16" preserveAspectRatio="none" focusable="false">
-            <path d="M-30 8 C0 8 10 2 40 2 S80 14 110 14 S150 2 180 2 S220 14 250 14 S290 8 320 8" />
-          </svg>
-        </span>)}
-      </span>
+      <span className="liquid-progress-fill" style={{ width: `${progress}%` }} />
+      {progress > 0 && [0, 1, 2].map(orbit => <span key={orbit} className="liquid-progress-orbit" style={{ '--orbit-offset': `${-orbit * 1.6}s`, left: `${20 + orbit * 30}%` } as CSSProperties}>
+        <svg viewBox="0 0 20 20" focusable="false">
+          <path className="orbit-back" d="M10 2a8 8 0 0 0 0 16" />
+          <path className="orbit-front" d="M10 18a8 8 0 0 0 0-16" />
+          <circle className="liquid-progress-orbit-trail" cx="10" cy="10" r="8" />
+        </svg>
+        <span className="liquid-progress-orbit-light" />
+      </span>)}
     </span>
     <span><em>{label}</em><strong>{progress}%</strong></span>
   </span>
