@@ -20,8 +20,14 @@ Fuentes comprobadas el 4 de octubre de 2026:
 - https://cards.disneylorcana.com/en-US/?cardId=1641
 - https://api.lorcast.com/v0/cards/search?q=hunny (clasificaciones por versión)
 
-El sello usa los iconos oficiales existentes. Fragmentos del símbolo convergen,
-partículas de pigmento se reúnen y un aro con las tintas combinadas se cierra.
+Los botones de añadir se bloquean al alcanzar el límite por nombre completo,
+incluidas otras ediciones. El editor muestra cantidad/límite y el catálogo el
+total compartido. Una importación con exceso se rechaza sin reemplazar el mazo.
+Los mazos antiguos con exceso pueden corregirse, pero no guardarse con exceso.
+
+El sello usa los iconos oficiales existentes. Un efecto canvas de duración finita
+dibuja corrientes entrelazadas, reconstruye el símbolo a partir de sus píxeles y
+cierra la combinación con trazados concéntricos y un anillo de impacto.
 Los símbolos quedan visibles al terminar. Se anima al cambiar la identidad de
 tinta; añadir copias no reinicia el efecto. No bloquea acciones y cancela efectos
 anteriores si cambian las tintas rápidamente. Respeta movimiento reducido.

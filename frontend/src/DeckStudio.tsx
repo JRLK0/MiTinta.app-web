@@ -1,5 +1,5 @@
 import { DeckInkCrest } from './DeckInkCrest'
-import { validateDeck } from './deckRules'
+import { changeDeckCopies, deckCopyState, validateDeck } from './deckRules'
 import { ThemeToggle } from '../../shared/ThemeToggle'
 import { ChangeEvent, useEffect, useMemo, useState } from 'react'
 import type { Session } from '@supabase/supabase-js'
@@ -195,23 +195,19 @@ export function DeckStudio({ session, collection, ownershipForCard, onAddCopy }:
   }
 
   function changeCard(card: CatalogCard, delta: number) {
-    setEntries((current) => {
-      const existing = current.find((entry) => entry.card_id === card.id)
-      if (!existing && delta > 0) return [...current, entryFromCard(card)]
-      return current
-        .map((entry) => entry.card_id === card.id ? { ...entry, quantity: Math.max(0, Math.min(Number.MAX_SAFE_INTEGER, entry.quantity + delta)) } : entry)
-        .filter((entry) => entry.quantity > 0)
-    })
+    setEntries(current => changeDeckCopies(current, entryFromCard(card), delta))
   }
 
   function changeEntry(cardId: string, delta: number) {
-    setEntries((current) => current
-      .map((entry) => entry.card_id === cardId ? { ...entry, quantity: Math.max(0, Math.min(Number.MAX_SAFE_INTEGER, entry.quantity + delta)) } : entry)
-      .filter((entry) => entry.quantity > 0))
+    setEntries(current => {
+      const entry = current.find(card => card.card_id === cardId)
+      return entry ? changeDeckCopies(current, entry, delta) : current
+    })
   }
 
   async function saveDeck() {
     if (!name.trim()) return setMessage('Ponle un nombre al mazo.')
+    if (validateDeck(entries).tooMany > 0) return setMessage('Reduce las copias que exceden el límite antes de guardar el mazo.')
     setSaving(true)
     setMessage('')
     const deckPayload = { user_id: session.user.id, name: name.trim(), description: description.trim(), is_public: isPublic }
@@ -312,6 +308,11 @@ export function DeckStudio({ session, collection, ownershipForCard, onAddCopy }:
         : byTitle.get(normalize(requirement.name))
       return card ? [entryFromCard(card, requirement.count)] : []
     })
+    const copyIssues = validateDeck(imported)
+    if (copyIssues.tooMany > 0) {
+      setImportError(`No se ha importado el mazo. ${copyIssues.issues.filter(issue => issue.includes('copias; máximo')).join(' ')}`)
+      return
+    }
     setEntries(imported)
     setMessage(`${imported.length} cartas distintas importadas; ${requirements.length - imported.length} sin identificar.`)
     setImportText('')
@@ -407,11 +408,12 @@ export function DeckStudio({ session, collection, ownershipForCard, onAddCopy }:
                 const availabilityKey = deckAvailabilityKey(entry.card_name, entry.card_version)
                 const cardAvailability = availability.get(availabilityKey) ?? { owned: 0, required: entry.quantity, remaining: 0, missing: entry.quantity }
                 const missingPrice = priceSummary.missingPrices.get(availabilityKey)
+                const copyState = deckCopyState(entries, entry)
                 return <article key={entry.card_id} className={`deck-row${cardAvailability.missing > 0 ? ' is-missing' : ' is-owned'}`}>
                   <button className="deck-preview" onClick={() => { const source = catalog.find((card) => card.id === entry.card_id); setSelectedCard({ id: entry.card_id, name: entry.card_name, version: entry.card_version, imageUrl: entry.image_url, setCode: entry.set_code, setName: source?.set_name, collectorNumber: entry.collector_number, rarity: source?.rarity, ink: entry.ink, normalPriceEur: entry.normal_price_eur, foilPriceEur: entry.foil_price_eur }) }} aria-label={`Ver ${entry.card_name}, ${entry.card_version}`}>{entry.image_url ? <img src={entry.image_url} alt="" /> : <span className="deck-thumb"><Sparkles /></span>}</button>
-                  <div><strong>{entry.card_name}</strong><span>{entry.card_version || `${entry.set_code} #${entry.collector_number}`}</span><small className={cardAvailability.missing === 0 ? 'owned' : 'missing'}>{cardAvailability.missing === 0 ? <><CheckCircle2 />Completa · tienes {cardAvailability.owned}</> : <><CircleAlert />Faltan {cardAvailability.missing} · tienes {cardAvailability.owned} de {cardAvailability.required}</>}</small>{cardAvailability.missing > 0 && <span className="deck-row-price">{missingPrice?.unitPrice == null ? 'Precio aproximado no disponible' : `≈ ${euro(missingPrice.unitPrice)} por carta · ${euro(missingPrice.totalPrice ?? 0)} pendientes`}</span>}</div>
+                  <div><strong>{entry.card_name}</strong><span>{entry.card_version || `${entry.set_code} #${entry.collector_number}`}</span>{copyState.count !== entry.quantity && <small className="deck-shared-copy-limit">{copyState.count}/{Number.isFinite(copyState.limit) ? copyState.limit : '∞'} copias entre todas las ediciones</small>}<small className={cardAvailability.missing === 0 ? 'owned' : 'missing'}>{cardAvailability.missing === 0 ? <><CheckCircle2 />Completa · tienes {cardAvailability.owned}</> : <><CircleAlert />Faltan {cardAvailability.missing} · tienes {cardAvailability.owned} de {cardAvailability.required}</>}</small>{cardAvailability.missing > 0 && <span className="deck-row-price">{missingPrice?.unitPrice == null ? 'Precio aproximado no disponible' : `≈ ${euro(missingPrice.unitPrice)} por carta · ${euro(missingPrice.totalPrice ?? 0)} pendientes`}</span>}</div>
                   <b className="cost-pip">{entry.cost ?? '-'}</b>
-                  <div className="mini-stepper"><button onClick={() => changeEntry(entry.card_id, -1)} aria-label={`Quitar una copia de ${entry.card_name}`}><Minus /></button><output>{entry.quantity}</output><button onClick={() => changeEntry(entry.card_id, 1)} aria-label={`Añadir una copia de ${entry.card_name}`}><Plus /></button></div>
+                  <div className="mini-stepper"><button onClick={() => changeEntry(entry.card_id, -1)} aria-label={`Quitar una copia de ${entry.card_name}`}><Minus /></button><output title={`${copyState.count} copias entre todas las ediciones`}>{entry.quantity}<small>/{Number.isFinite(copyState.limit) ? copyState.limit : '∞'}</small></output><button disabled={!copyState.canAdd} title={copyState.canAdd ? 'Añadir copia' : `Máximo ${copyState.limit} copias entre todas las ediciones`} onClick={() => changeEntry(entry.card_id, 1)} aria-label={`Añadir una copia de ${entry.card_name}`}><Plus /></button></div>
                 </article>
               })}
               {entries.length === 0 && <div className="builder-empty"><BookOpen /><strong>Empieza tu lista</strong><span>Busca cartas en el catálogo o importa un mazo completo.</span><button className="import-command" onClick={openImporter}><FileUp />Importar mazo</button></div>}
@@ -424,8 +426,9 @@ export function DeckStudio({ session, collection, ownershipForCard, onAddCopy }:
             {catalogError && <p className="notice error">{catalogError}</p>}
             {loadingCatalog ? <p className="picker-loading">Descargando catálogo…</p> : <div className="picker-grid">{visibleCatalog.map((card) => {
               const cardAvailability = availability.get(deckAvailabilityKey(card.name, card.version)) ?? { owned: 0, required: 0, remaining: 0, missing: 0 }
+              const copyState = deckCopyState(entries, entryFromCard(card))
               const ownership = cardAvailability.remaining > 0 ? 'available' : cardAvailability.owned > 0 ? 'used' : 'unowned'
-              return <article key={card.id} className={`picker-card ownership-${ownership}`}><div className={`ownership-badge ${ownership}`}>{ownership === 'available' ? <><CheckCircle2 />Tienes {cardAvailability.remaining} disponible{cardAvailability.remaining === 1 ? '' : 's'}</> : ownership === 'used' ? 'Copias ya usadas' : 'No la tienes'}</div><button className="picker-preview" onClick={() => setSelectedCard({ id: card.id, name: card.name, version: card.version, imageUrl: card.image_url, setCode: card.set_code, setName: card.set_name, collectorNumber: card.collector_number, rarity: card.rarity, ink: card.ink, normalPriceEur: card.normal_price_eur, foilPriceEur: card.foil_price_eur })} aria-label={`Ver ${cardTitle(card)}`}>{card.image_url ? <img src={card.image_url} alt={cardTitle(card)} loading="lazy" /> : <span className="deck-thumb"><Sparkles /></span>}</button><button onClick={() => changeCard(card, 1)} title={`Añadir ${cardTitle(card)}`} aria-label={`Añadir ${cardTitle(card)}`}><Plus /></button><div><strong>{card.name}</strong><span>{card.version}</span></div></article>
+              return <article key={card.id} className={`picker-card ownership-${ownership}`}><div className={`ownership-badge ${ownership}`}>{ownership === 'available' ? <><CheckCircle2 />Tienes {cardAvailability.remaining} disponible{cardAvailability.remaining === 1 ? '' : 's'}</> : ownership === 'used' ? 'Copias ya usadas' : 'No la tienes'}</div><button className="picker-preview" onClick={() => setSelectedCard({ id: card.id, name: card.name, version: card.version, imageUrl: card.image_url, setCode: card.set_code, setName: card.set_name, collectorNumber: card.collector_number, rarity: card.rarity, ink: card.ink, normalPriceEur: card.normal_price_eur, foilPriceEur: card.foil_price_eur })} aria-label={`Ver ${cardTitle(card)}`}>{card.image_url ? <img src={card.image_url} alt={cardTitle(card)} loading="lazy" /> : <span className="deck-thumb"><Sparkles /></span>}</button><button disabled={!copyState.canAdd} onClick={() => changeCard(card, 1)} title={copyState.canAdd ? `Añadir ${cardTitle(card)}` : `Máximo ${copyState.limit} copias entre todas las ediciones`} aria-label={`Añadir ${cardTitle(card)}`}><Plus /></button><div><strong>{card.name}</strong><span>{card.version}</span><small className={`deck-copy-count${!copyState.canAdd ? ' at-limit' : ''}`}>{copyState.count}/{Number.isFinite(copyState.limit) ? copyState.limit : '∞'} en el mazo{!copyState.canAdd ? ' · Máximo' : ''}</small></div></article>
             })}</div>}
           </div>
         </div>

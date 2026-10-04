@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { validateDeck } from './deckRules'
+import { changeDeckCopies, deckCopyState, validateDeck } from './deckRules'
 import type { DeckDraftEntry } from './deckDraft'
 
 function card(name: string, version = '', ink = 'Amethyst', quantity = 1, id = name): DeckDraftEntry {
@@ -9,6 +9,33 @@ function card(name: string, version = '', ink = 'Amethyst', quantity = 1, id = n
 const robin = card('Christopher Robin', 'Hunny Sage', 'Amethyst / Sapphire')
 
 describe('constructed deck rules', () => {
+  it('blocks the fifth copy from both an existing row and another printing', () => {
+    const full = [card('Elsa', 'Snow Queen', 'Amethyst', 4, 'first')]
+    expect(changeDeckCopies(full, full[0], 1)).toBe(full)
+    expect(changeDeckCopies(full, card('Elsa', 'Snow Queen', 'Amethyst', 1, 'reprint'), 1)).toBe(full)
+    expect(deckCopyState(full, full[0])).toEqual({ count: 4, limit: 4, canAdd: false })
+  })
+  it('aggregates editions before adding and unlocks after removing a copy', () => {
+    const cards = [card('Elsa', 'Snow Queen', 'Amethyst', 2, 'a'), card('Elsa', 'Snow Queen', 'Amethyst', 1, 'b')]
+    const full = changeDeckCopies(cards, cards[1], 1)
+    expect(deckCopyState(full, cards[0]).canAdd).toBe(false)
+    const reduced = changeDeckCopies(full, cards[0], -1)
+    expect(deckCopyState(reduced, cards[0]).canAdd).toBe(true)
+    expect(deckCopyState(changeDeckCopies(reduced, cards[0], 1), cards[0]).count).toBe(4)
+  })
+  it('allows removing imported excess and keeps different versions separate', () => {
+    const excess = [card('Elsa', 'Snow Queen', 'Amethyst', 6)]
+    expect(changeDeckCopies(excess, excess[0], -1)[0].quantity).toBe(5)
+    expect(changeDeckCopies(excess, card('Elsa', 'Spirit', 'Amethyst', 1, 'spirit'), 1)).toHaveLength(2)
+  })
+  it('uses special copy limits in the actual add operation', () => {
+    const slipper = [card('The Glass Slipper', '', 'Amber', 2)]
+    expect(changeDeckCopies(slipper, slipper[0], 1)).toBe(slipper)
+    const puppies = [card('Dalmatian Puppy', 'Tail Wagger', 'Amber', 99)]
+    expect(changeDeckCopies(puppies, puppies[0], 1)).toBe(puppies)
+    const bots = [card('Microbots', '', 'Sapphire', 120)]
+    expect(changeDeckCopies(bots, bots[0], 1)[0].quantity).toBe(121)
+  })
   it('requires at least 60 cards and permits more than 60', () => {
     expect(validateDeck([card('Microbots', '', 'Sapphire', 59)]).valid).toBe(false)
     expect(validateDeck([card('Microbots', '', 'Sapphire', 61)]).valid).toBe(true)

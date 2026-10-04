@@ -14,7 +14,27 @@ function normalize(value: string) {
   return value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/\s+/g, ' ').trim()
 }
 
-function identity(entry: DeckDraftEntry) { return normalize(`${entry.card_name}|${entry.card_version}`) }
+type CopyIdentity = Pick<DeckDraftEntry, 'card_name' | 'card_version'>
+export function deckCardIdentity(entry: CopyIdentity) { return normalize(`${entry.card_name}|${entry.card_version}`) }
+const identity = deckCardIdentity
+export function deckCopyLimit(entry: CopyIdentity) {
+  const key = identity(entry)
+  return key === normalize('Dalmatian Puppy|Tail Wagger') ? 99 :
+    key === normalize('Microbots|') ? Infinity : key === normalize('The Glass Slipper|') ? 2 : 4
+}
+export function deckCopyState(entries: DeckDraftEntry[], card: CopyIdentity) {
+  const count = entries.filter(entry => identity(entry) === identity(card)).reduce((sum, entry) => sum + entry.quantity, 0)
+  const limit = deckCopyLimit(card)
+  return { count, limit, canAdd: count < limit }
+}
+export function changeDeckCopies(entries: DeckDraftEntry[], card: DeckDraftEntry, delta: number) {
+  const state = deckCopyState(entries, card)
+  if (delta > 0 && state.count + delta > state.limit) return entries
+  const existing = entries.find(entry => entry.card_id === card.card_id)
+  if (!existing) return delta > 0 ? [...entries, { ...card, quantity: delta }] : entries
+  return entries.map(entry => entry.card_id === card.card_id ? { ...entry, quantity: Math.max(0, entry.quantity + delta) } : entry)
+    .filter(entry => entry.quantity > 0)
+}
 export function cardInks(ink: string | null) { return ink?.split('/').map(value => value.trim()).filter(Boolean) ?? [] }
 
 export function validateDeck(entries: DeckDraftEntry[]) {
@@ -33,8 +53,7 @@ export function validateDeck(entries: DeckDraftEntry[]) {
   const copies = new Map<string, { count: number; limit: number; title: string }>()
   for (const entry of active) {
     const key = identity(entry)
-    const limit = key === normalize('Dalmatian Puppy|Tail Wagger') ? 99 :
-      key === normalize('Microbots|') ? Infinity : key === normalize('The Glass Slipper|') ? 2 : 4
+    const limit = deckCopyLimit(entry)
     const previous = copies.get(key)
     copies.set(key, { count: (previous?.count ?? 0) + entry.quantity, limit, title: `${entry.card_name}${entry.card_version ? ` — ${entry.card_version}` : ''}` })
   }
