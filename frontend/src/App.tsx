@@ -103,10 +103,10 @@ export default function App() {
   }, [])
 
   const sharedDeckId = new URLSearchParams(window.location.search).get('deck')
-  if (sharedDeckId) return <><PublicDeck deckId={sharedDeckId} /><FanCredit /></>
   if (checkingSession) return <LoadingScreen />
   if (passwordRecovery) return <><PasswordRecoveryScreen onComplete={() => setPasswordRecovery(false)} /><FanCredit /></>
   if (!session) return <>{showAuth ? <AuthScreen onBack={() => setShowAuth(false)} /> : <GuestDashboard onSignIn={() => setShowAuth(true)} />}<FanCredit /></>
+  if (sharedDeckId) return <><PublicDeck deckId={sharedDeckId} /><FanCredit /></>
   return <><CollectionDashboard key={session.user.id} session={session} /><FanCredit /></>
 }
 
