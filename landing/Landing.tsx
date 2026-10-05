@@ -17,6 +17,12 @@ const OpenCollection = ({ text = 'Abrir mi colección' }: { text?: string }) => 
 
 export function Landing() {
   return <div className="site">
+    <div className="ink-atmosphere" aria-hidden="true">
+      <span className="ink-cloud amethyst" />
+      <span className="ink-cloud sapphire" />
+      <span className="ink-cloud amber" />
+      <span className="ink-current" />
+    </div>
     <header className="site-header">
       <a className="site-brand" href={base} aria-label="MiTinta, inicio"><img src={`${base}ink-icons/amethyst.png`} alt="" width="28" height="28" />MiTinta</a>
       <nav aria-label="Navegación principal"><a href="#funciones">Funciones</a><a href={`${base}privacy/`}>Privacidad</a></nav>
