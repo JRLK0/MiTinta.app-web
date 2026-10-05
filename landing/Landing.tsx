@@ -1,4 +1,5 @@
 import { ThemeToggle } from '../shared/ThemeToggle'
+import { FanCredit } from '../shared/FanCredit'
 import { ArrowRight, Check, Layers3, LibraryBig, ListChecks } from 'lucide-react'
 
 const CARDS = [
@@ -44,6 +45,6 @@ export function Landing() {
       <section className="quiet-section" aria-labelledby="android-title"><h2 id="android-title">En la mesa y donde estés.</h2><p>Escanea en Android y consulta tu colección en la web.<br />El reconocimiento ocurre en el móvil: la imagen de la cámara no se guarda ni se envía.</p><span className="availability">Android · Próximamente en Google Play</span></section>
       <section className="closing" aria-labelledby="closing-title"><h2 id="closing-title">Haz sitio a tu colección.</h2><p>Gratis, sin anuncios ni suscripciones.</p><OpenCollection /><span><Check aria-hidden="true" />Cuenta por correo. Tus cartas, sincronizadas.</span></section>
     </main>
-    <footer className="site-footer"><div><a className="site-brand" href={base}>MiTinta</a><a href={`${base}privacy/`}>Política de privacidad</a></div><p>Aplicación no oficial y no afiliada, respaldada ni aprobada por Disney o Ravensburger. Las imágenes, nombres y marcas pertenecen a sus respectivos titulares. Imágenes de cartas de Lorcast. Las colecciones y listas mostradas son ejemplos ilustrativos.</p></footer>
+    <footer className="site-footer"><div><a className="site-brand" href={base}>MiTinta</a><a href={`${base}privacy/`}>Política de privacidad</a></div><p>Las imágenes de cartas proceden de Lorcast. Las colecciones y listas mostradas son ejemplos ilustrativos.</p><FanCredit /></footer>
   </div>
 }

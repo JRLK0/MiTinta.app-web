@@ -1,0 +1,4 @@
+.fan-credit { max-width: 1100px; margin: 24px auto; padding: 16px 24px 88px; color: var(--muted); font: 12px/1.7 var(--font-ui); }
+.fan-credit summary { cursor: pointer; min-height: 44px; display: flex; align-items: center; }
+.fan-credit p { margin: 8px 0; }
+.fan-credit a { color: var(--accent); text-decoration: underline; }

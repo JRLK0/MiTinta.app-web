@@ -33,6 +33,7 @@ type CardViewerProps = {
   printings?: ViewerCard[]
   ownershipForCard?: OwnershipForCard
   onAddCopy?: AddCopy
+  onRequireSignIn?: () => void
   onClose: () => void
 }
 
@@ -54,7 +55,7 @@ function writeFoilMotion(element: HTMLElement, motion: FoilMotion) {
   element.style.setProperty('--combined', `${motion.combined}%`)
 }
 
-export function CardViewer({ card, foil = false, canToggleFoil = false, printings = [], ownershipForCard, onAddCopy, onClose }: CardViewerProps) {
+export function CardViewer({ card, foil = false, canToggleFoil = false, printings = [], ownershipForCard, onAddCopy, onRequireSignIn, onClose }: CardViewerProps) {
   const [activeCard, setActiveCard] = useState(card)
   const [foilMode, setFoilMode] = useState(foil)
   const [adding, setAdding] = useState(false)
@@ -364,6 +365,7 @@ export function CardViewer({ card, foil = false, canToggleFoil = false, printing
             {activeCard.ink && <span>{activeCard.ink}</span>}
           </div>
           <strong className="viewer-price">{price == null ? 'Sin precio' : price.toLocaleString('es-ES', { style: 'currency', currency: 'EUR' })}</strong>
+          {!onAddCopy && onRequireSignIn && <button className="primary-command" onClick={() => { onClose(); onRequireSignIn() }}>Entrar para añadir a mi colección</button>}
           {onAddCopy && <div className="viewer-add">
             <div className="viewer-quantity-row"><span>{effectiveFoilMode ? 'Foil' : 'Normal'} en tu colección</span><div className="viewer-quantity-stepper" role="group" aria-label={`Cantidad ${effectiveFoilMode ? 'foil' : 'normal'} en tu colección`} aria-busy={adding}>
               <button type="button" onClick={() => void changeCopy(-1)} disabled={adding || !activeCard.id || (effectiveFoilMode ? owned.foil : owned.normal) === 0} aria-label={`Restar una copia ${effectiveFoilMode ? 'foil' : 'normal'}`}><Minus aria-hidden="true" /></button>

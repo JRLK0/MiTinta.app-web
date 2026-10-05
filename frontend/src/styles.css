@@ -1759,3 +1759,17 @@ button:disabled { cursor: not-allowed; }
 }
 .deck-options:not([open]) > .deck-options-panel, .deck-insights:not([open]) > .deck-insights-panel { display: none; }
 .deck-workspace .deck-stack .section-title { overflow: hidden; }
+.guest-signin { min-height: 44px; padding: 8px 16px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); color: var(--accent); font-weight: 600; }
+.public-albums header { margin-bottom: 24px; }
+.public-albums h1 { font-size: clamp(24px, 4vw, 32px); margin: 0 0 8px; }
+.public-albums header p { color: var(--muted); }
+.album-search { display: flex; align-items: center; gap: 12px; max-width: 440px; padding: 10px 14px; border: 1px solid var(--line); border-radius: 12px; }
+.album-search input { min-width: 0; width: 100%; background: transparent; border: 0; color: var(--ink); padding: 6px 0; }
+.public-album-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); gap: 12px; }
+.public-album-list > button { display: flex; align-items: center; gap: 16px; padding: 16px; text-align: left; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; color: var(--ink); }
+.public-album-list img { width: 48px; height: 67px; object-fit: cover; border-radius: 5px; }
+.public-album-list span { display: grid; gap: 5px; flex: 1; }
+.public-album-list small { color: var(--muted); }
+.public-album-list strong { font-size: 16px; }
+.album-back { display: flex; align-items: center; gap: 8px; margin-bottom: 16px; min-height: 44px; }
+@media (max-width: 720px) { .guest-shell .app-bottom-nav { grid-template-columns: repeat(4, 1fr); } .guest-shell .app-bottom-nav button { font-size: 11px; padding-inline: 4px; } }

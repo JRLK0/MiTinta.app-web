@@ -6,9 +6,9 @@ import { cardPrice, cardTitle, catalogReprints, isFoilOnlyRarity, loadCatalog, t
 import { CardFilterBar, COMMON_SORT_OPTIONS, CostSymbol } from './CardFilterBar'
 import { EMPTY_CARD_FILTERS, filterCards, sortCards, type CardFilterState, type CommonSortMode, type FilterableCard } from './cardFilters'
 
-export function CatalogBrowser({ ownershipForCard, onAddCopy }: { ownershipForCard: OwnershipForCard; onAddCopy: AddCopy }) {
+export function CatalogBrowser({ ownershipForCard, onAddCopy, onRequireSignIn, initialSet }: { ownershipForCard?: OwnershipForCard; onAddCopy?: AddCopy; onRequireSignIn?: () => void; initialSet?: string }) {
   const [cards, setCards] = useState<CatalogCard[]>([])
-  const [filters, setFilters] = useState<CardFilterState>({ ...EMPTY_CARD_FILTERS })
+  const [filters, setFilters] = useState<CardFilterState>({ ...EMPTY_CARD_FILTERS, setCode: initialSet ?? 'ALL' })
   const [sort, setSort] = useState<CommonSortMode>('set')
   const [availability, setAvailability] = useState<'ALL' | 'PRICED' | 'FOIL' | 'REPRINT'>('ALL')
   const [error, setError] = useState('')
@@ -50,6 +50,7 @@ export function CatalogBrowser({ ownershipForCard, onAddCopy }: { ownershipForCa
       canToggleFoil={selectedCard.foil_price_eur != null}
       ownershipForCard={ownershipForCard}
       onAddCopy={onAddCopy}
+      onRequireSignIn={onRequireSignIn}
       onClose={() => setSelectedCard(null)}
     />}
   </section>

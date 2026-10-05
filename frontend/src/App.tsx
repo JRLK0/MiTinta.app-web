@@ -1,5 +1,7 @@
 import { collectionCopyTarget } from './collectionCopyTarget'
 import { ThemeToggle } from '../../shared/ThemeToggle'
+import { FanCredit } from '../../shared/FanCredit'
+import { GuestDashboard } from './GuestDashboard'
 import { CSSProperties, FormEvent, useEffect, useMemo, useRef, useState } from 'react'
 import type { Session } from '@supabase/supabase-js'
 import {
@@ -84,6 +86,7 @@ export default function App() {
   const [session, setSession] = useState<Session | null>(null)
   const [checkingSession, setCheckingSession] = useState(true)
   const [passwordRecovery, setPasswordRecovery] = useState(false)
+  const [showAuth, setShowAuth] = useState(false)
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
@@ -92,7 +95,7 @@ export default function App() {
     })
     const { data } = supabase.auth.onAuthStateChange((event, nextSession) => {
       if (event === 'PASSWORD_RECOVERY') setPasswordRecovery(true)
-      else if (event === 'SIGNED_OUT') setPasswordRecovery(false)
+      else if (event === 'SIGNED_OUT') { setPasswordRecovery(false); setShowAuth(false) }
       setSession(nextSession)
       setCheckingSession(false)
     })
@@ -100,11 +103,11 @@ export default function App() {
   }, [])
 
   const sharedDeckId = new URLSearchParams(window.location.search).get('deck')
-  if (sharedDeckId) return <PublicDeck deckId={sharedDeckId} />
+  if (sharedDeckId) return <><PublicDeck deckId={sharedDeckId} /><FanCredit /></>
   if (checkingSession) return <LoadingScreen />
-  if (passwordRecovery) return <PasswordRecoveryScreen onComplete={() => setPasswordRecovery(false)} />
-  if (!session) return <AuthScreen />
-  return <CollectionDashboard session={session} />
+  if (passwordRecovery) return <><PasswordRecoveryScreen onComplete={() => setPasswordRecovery(false)} /><FanCredit /></>
+  if (!session) return <>{showAuth ? <AuthScreen onBack={() => setShowAuth(false)} /> : <GuestDashboard onSignIn={() => setShowAuth(true)} />}<FanCredit /></>
+  return <><CollectionDashboard key={session.user.id} session={session} /><FanCredit /></>
 }
 
 function LoadingScreen() {
@@ -116,7 +119,7 @@ function LoadingScreen() {
   )
 }
 
-function AuthScreen() {
+function AuthScreen({ onBack }: { onBack: () => void }) {
   const [createAccount, setCreateAccount] = useState(false)
   const [email, setEmail] = useState(() => new URLSearchParams(window.location.search).get('email') ?? '')
   const [password, setPassword] = useState('')
@@ -172,6 +175,7 @@ function AuthScreen() {
           </div>
         </div>
         <p className="auth-intro">Tu colección de Lorcana, siempre contigo.</p>
+        <button type="button" className="text-command" onClick={onBack}>Volver al catálogo sin cuenta</button>
         {!isConfigured && (
           <p className="notice error">Falta configurar la conexión pública con Supabase.</p>
         )}
