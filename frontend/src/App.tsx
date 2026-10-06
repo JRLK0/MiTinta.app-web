@@ -22,7 +22,8 @@ import {
   ZoomIn,
   ZoomOut,
 } from 'lucide-react'
-import { isConfigured, supabase } from './supabase'
+import { initialAuthCallback, isConfigured, supabase } from './supabase'
+import { authCallbackMessage } from './authCallback'
 import { CatalogBrowser } from './CatalogBrowser'
 import { CardFilterBar, COMMON_SORT_OPTIONS } from './CardFilterBar'
 import { CardViewer, type AddCopy, type OwnershipForCard } from './CardViewer'
@@ -85,16 +86,24 @@ function csvCell(value: string | number) {
 export default function App() {
   const [session, setSession] = useState<Session | null>(null)
   const [checkingSession, setCheckingSession] = useState(true)
-  const [passwordRecovery, setPasswordRecovery] = useState(false)
-  const [showAuth, setShowAuth] = useState(false)
+  const [passwordRecovery, setPasswordRecovery] = useState(initialAuthCallback.recovery && !initialAuthCallback.error)
+  const [showAuth, setShowAuth] = useState(initialAuthCallback.error)
+  const [callbackMessage, setCallbackMessage] = useState('')
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
       setSession(data.session)
+      const message = authCallbackMessage(initialAuthCallback, Boolean(data.session))
+      if (message) {
+        setCallbackMessage(message)
+        setPasswordRecovery(false)
+        setShowAuth(true)
+      }
       setCheckingSession(false)
     })
     const { data } = supabase.auth.onAuthStateChange((event, nextSession) => {
-      if (event === 'PASSWORD_RECOVERY') setPasswordRecovery(true)
+      if (event === 'PASSWORD_RECOVERY') { setPasswordRecovery(true); setCallbackMessage('') }
+      else if (event === 'SIGNED_IN') { setCallbackMessage(''); setShowAuth(false) }
       else if (event === 'SIGNED_OUT') { setPasswordRecovery(false); setShowAuth(false) }
       setSession(nextSession)
       setCheckingSession(false)
@@ -104,7 +113,8 @@ export default function App() {
 
   const sharedDeckId = new URLSearchParams(window.location.search).get('deck')
   if (checkingSession) return <LoadingScreen />
-  if (passwordRecovery) return <><PasswordRecoveryScreen onComplete={() => setPasswordRecovery(false)} /><FanCredit /></>
+  if (callbackMessage && showAuth) return <><AuthScreen initialMessage={callbackMessage} onBack={() => { setShowAuth(false); setCallbackMessage('') }} /><FanCredit /></>
+  if (passwordRecovery && session) return <><PasswordRecoveryScreen onComplete={() => setPasswordRecovery(false)} /><FanCredit /></>
   if (!session) return <>{showAuth ? <AuthScreen onBack={() => setShowAuth(false)} /> : <GuestDashboard onSignIn={() => setShowAuth(true)} />}<FanCredit /></>
   if (sharedDeckId) return <><PublicDeck deckId={sharedDeckId} /><FanCredit /></>
   return <><CollectionDashboard key={session.user.id} session={session} /><FanCredit /></>
@@ -119,12 +129,12 @@ function LoadingScreen() {
   )
 }
 
-function AuthScreen({ onBack }: { onBack: () => void }) {
+function AuthScreen({ onBack, initialMessage = '' }: { onBack: () => void; initialMessage?: string }) {
   const [createAccount, setCreateAccount] = useState(false)
   const [email, setEmail] = useState(() => new URLSearchParams(window.location.search).get('email') ?? '')
   const [password, setPassword] = useState('')
   const [busy, setBusy] = useState(false)
-  const [message, setMessage] = useState('')
+  const [message, setMessage] = useState(initialMessage)
   const [messageIsSuccess, setMessageIsSuccess] = useState(false)
 
   async function submit(event: FormEvent) {
