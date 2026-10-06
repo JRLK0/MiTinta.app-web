@@ -1,9 +1,10 @@
 import { CSSProperties, PointerEvent, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { Check, Gem, Minus, Move3D, Plus, X } from 'lucide-react'
+import { Check, ExternalLink, Gem, Minus, Move3D, Plus, X } from 'lucide-react'
 import { FoilProfile, foilHasTopLayer, foilMaskUrls, foilProfileFor } from './foilEffect'
 import { deviceTiltFromOrientation } from './cardMotion'
 import { isFoilOnlyRarity } from './catalog'
+import { cardmarketLink } from './cardmarket'
 import './cardQuantity.css'
 
 export type ViewerCard = {
@@ -254,6 +255,7 @@ export function CardViewer({ card, foil = false, canToggleFoil = false, printing
   }
 
   const price = effectiveFoilMode ? activeCard.foilPriceEur : activeCard.normalPriceEur
+  const marketLink = cardmarketLink(activeCard)
   const tiltStyle = {
     '--rotate-x': '0deg',
     '--rotate-y': '0deg',
@@ -365,6 +367,9 @@ export function CardViewer({ card, foil = false, canToggleFoil = false, printing
             {activeCard.ink && <span>{activeCard.ink}</span>}
           </div>
           <strong className="viewer-price">{price == null ? 'Sin precio' : price.toLocaleString('es-ES', { style: 'currency', currency: 'EUR' })}</strong>
+          <a className="viewer-cardmarket" href={marketLink.url} target="_blank" rel="noopener noreferrer" aria-label={`${marketLink.direct ? 'Ver' : 'Buscar'} ${activeCard.name}${activeCard.version ? ` - ${activeCard.version}` : ''} en Cardmarket (se abre en otra pestaña)`}>
+            {marketLink.direct ? 'Ver en Cardmarket' : 'Buscar en Cardmarket'}<ExternalLink aria-hidden="true" />
+          </a>
           {!onAddCopy && onRequireSignIn && <button className="primary-command" onClick={() => { onClose(); onRequireSignIn() }}>Entrar para añadir a mi colección</button>}
           {onAddCopy && <div className="viewer-add">
             <div className="viewer-quantity-row"><span>{effectiveFoilMode ? 'Foil' : 'Normal'} en tu colección</span><div className="viewer-quantity-stepper" role="group" aria-label={`Cantidad ${effectiveFoilMode ? 'foil' : 'normal'} en tu colección`} aria-busy={adding}>

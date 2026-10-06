@@ -1231,6 +1231,10 @@ h1, h2 { font-family: inherit; letter-spacing: 0; }
 .viewer-meta { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 22px; }
 .viewer-meta span { padding: 5px 7px; border: 1px solid rgba(255,255,255,.2); border-radius: 3px; color: var(--ink); font-size: 9px; text-transform: uppercase; }
 .viewer-price { margin-top: 18px; color: var(--ink); font-size: 22px; }
+.viewer-cardmarket { justify-self: start; min-height: 44px; display: inline-flex; align-items: center; gap: 7px; margin-top: 4px; color: var(--accent); font-size: 13px; font-weight: 550; text-decoration: none; }
+.viewer-cardmarket svg { width: 15px; height: 15px; }
+.viewer-cardmarket:hover { text-decoration: underline; text-underline-offset: 3px; }
+.viewer-cardmarket:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 4px; }
 .viewer-add { display: grid; gap: 8px; margin-top: 20px; }
 .viewer-add-copy { min-height: 46px; display: inline-flex; align-items: center; justify-content: center; gap: 9px; padding: 10px 14px; border: 1px solid #9be3c1; border-radius: 8px; color: #12231b; background: var(--surface-raised); font-size: 13px; font-weight: 800; }
 .viewer-add-copy:hover:not(:disabled) { filter: brightness(1.08); }

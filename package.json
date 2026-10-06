@@ -10,6 +10,7 @@
     "build:local": "tsc -b && vite build && vite build --config vite.landing.config.ts",
     "preview:site": "npx --yes serve . -p 4173",
     "sync:catalog": "node scripts/sync-catalog.mjs",
+    "sync:cardmarket-links": "node scripts/sync-cardmarket-links.mjs",
     "sync:foil-profiles": "node scripts/sync-foil-profiles.mjs",
     "test": "vitest run",
     "preview": "vite preview"

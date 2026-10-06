@@ -29,3 +29,5 @@ El constructor separa el catálogo (izquierda) de la lista (derecha). En móvil 
 Mis mazos es una biblioteca independiente del editor: muestra cartas reales, tintas animadas y el set numerado más alto de cada lista. Nuevo mazo exige elegir Core o Infinity antes de abrir el constructor. El botón Mis mazos vuelve a la biblioteca y conserva el borrador local; Continuar borrador permite retomarlo. Los resúmenes y las listas se cargan con paginación.
 
 El visor de cartas permite sumar y restar copias normales o foil mediante un contador. La resta usa una copia existente del acabado y la impresión seleccionados, incluso si está en otro idioma; nunca crea cantidades negativas. El acabado seleccionado se conserva al actualizar la colección y los controles se bloquean mientras se guarda.
+
+El visor incluye un enlace a la impresión seleccionada en Cardmarket, que abre otra pestaña. Los enlaces canónicos proceden de LorcanaJSON y se actualizan con `npm run sync:cardmarket-links`. Si no existe un enlace inequívoco para esa impresión, se ofrece una búsqueda por el nombre completo de la carta.
