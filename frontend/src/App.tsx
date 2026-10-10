@@ -32,6 +32,7 @@ import { collectionCardForFilters, EMPTY_CARD_FILTERS, filterCards, sortCards, t
 import { DeckStudio, PublicDeck } from './DeckStudio'
 import { playValuableCardSound, prepareValuableCardSound, valuableCardSoundFor } from './valuableCardSound'
 import { parsePriceHistory, priceTrendFor, updatePriceHistory, type PriceHistory } from './priceHistory'
+import { clearPrivateLocalData, setPrivateLocalDataOwner, writePrivateLocalData } from './privateLocalData'
 import { loadAllPages } from './pagination'
 import { SetCollectionView } from './SetCollectionView'
 import { CollectionActions } from './CollectionActions'
@@ -92,6 +93,7 @@ export default function App() {
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
+      setPrivateLocalDataOwner(data.session?.user.id ?? null)
       setSession(data.session)
       const message = authCallbackMessage(initialAuthCallback, Boolean(data.session))
       if (message) {
@@ -102,6 +104,7 @@ export default function App() {
       setCheckingSession(false)
     })
     const { data } = supabase.auth.onAuthStateChange((event, nextSession) => {
+      setPrivateLocalDataOwner(nextSession?.user.id ?? null)
       if (event === 'PASSWORD_RECOVERY') { setPasswordRecovery(true); setCallbackMessage('') }
       else if (event === 'SIGNED_IN') { setCallbackMessage(''); setShowAuth(false) }
       else if (event === 'SIGNED_OUT') { setPasswordRecovery(false); setShowAuth(false) }
@@ -332,7 +335,7 @@ function CollectionDashboard({ session }: { session: Session }) {
           key: collectionEntryKey(entry),
           price: cardPrice(entry, entry.finish),
         })))
-        window.localStorage.setItem(priceHistoryKey, JSON.stringify(next))
+        writePrivateLocalData(session.user.id, priceHistoryKey, JSON.stringify(next))
         return next
       })
       entriesRef.current = nextEntries
@@ -382,6 +385,7 @@ function CollectionDashboard({ session }: { session: Session }) {
       )
       .subscribe()
     return () => {
+      collectionRequestId.current += 1
       void supabase.removeChannel(channel)
       arrivalTimers.current.forEach((timer) => window.clearTimeout(timer))
       arrivalTimers.current.clear()
@@ -559,6 +563,7 @@ function CollectionDashboard({ session }: { session: Session }) {
       setError(deleteError.message)
       return
     }
+    clearPrivateLocalData()
     await supabase.auth.signOut({ scope: 'local' })
   }
 

@@ -21,6 +21,7 @@ import { parseDeck } from './deckImport'
 import { analyzeDeck, type DeckAnalyticsEntry } from './deckAnalytics'
 import { buildCardmarketMissingText, buildDeckAvailability, buildDeckPriceSummary, deckAvailabilityKey } from './deckAvailability'
 import { deckEditorFingerprint, parseDeckDraft, serializeDeckDraft, type DeckDraftEntry, type DeckEditorState } from './deckDraft'
+import { writePrivateLocalData } from './privateLocalData'
 import { preferredDeckPrinting } from './deckPrintingPreference'
 import { supabase } from './supabase'
 
@@ -148,7 +149,7 @@ export function DeckStudio({ session, collection, ownershipForCard, onAddCopy }:
       return
     }
     const timer = window.setTimeout(() => {
-      window.localStorage.setItem(draftKey, serializeDeckDraft(session.user.id, editorState))
+      writePrivateLocalData(session.user.id, draftKey, serializeDeckDraft(session.user.id, editorState))
     }, 350)
     return () => window.clearTimeout(timer)
   }, [draftKey, editorState, isDirty, session.user.id])
