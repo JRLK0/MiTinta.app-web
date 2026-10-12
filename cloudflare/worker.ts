@@ -3,8 +3,9 @@ type Env = { ASSETS: { fetch(request: Request): Promise<Response> } }
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url)
-    if (url.hostname === 'www.mitinta.app') {
-      url.hostname = 'mitinta.app'
+    if (url.hostname === 'www.mitinta.app' || url.protocol === 'http:') {
+      if (url.hostname === 'www.mitinta.app') url.hostname = 'mitinta.app'
+      url.protocol = 'https:'
       return Response.redirect(url.toString(), 308)
     }
     // Never let an unknown route fall back to HTML (especially backend.json).
