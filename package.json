@@ -13,7 +13,9 @@
     "sync:cardmarket-links": "node scripts/sync-cardmarket-links.mjs",
     "sync:foil-profiles": "node scripts/sync-foil-profiles.mjs",
     "test": "vitest run",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "build:cloudflare": "node scripts/build-cloudflare.mjs",
+    "deploy:cloudflare": "npm run build:cloudflare && cf deploy --prebuilt --mode production"
   },
   "dependencies": {
     "@fontsource-variable/archivo": "^5.3.0",
@@ -26,10 +28,12 @@
     "react-dom": "^19.1.1"
   },
   "devDependencies": {
+    "@cloudflare/vite-plugin": "2.0.0-beta.sha-91c870c02",
     "@types/papaparse": "^5.5.2",
     "@types/react": "^19.1.13",
     "@types/react-dom": "^19.1.9",
     "@vitejs/plugin-react": "^5.0.2",
+    "cf": "1.0.0-beta.12",
     "sharp": "0.35.5",
     "typescript": "^5.9.2",
     "vite": "^7.1.5",
