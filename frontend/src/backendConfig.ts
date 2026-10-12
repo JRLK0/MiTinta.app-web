@@ -26,6 +26,21 @@ export function sameBackend(a: BackendConfig, b: BackendConfig) {
   return a.url === b.url && a.publishableKey === b.publishableKey && a.version === b.version
 }
 
+export function prepareBackendSession(config: BackendConfig, storage: Storage) {
+  const identity = JSON.stringify({ url: config.url, publishableKey: config.publishableKey, version: config.version })
+  const previous = storage.getItem('mitinta-backend-identity')
+  if (previous && previous !== identity) {
+    try {
+      const old = JSON.parse(previous)
+      if (typeof old.version === 'string' && /^[a-zA-Z0-9_-]{1,64}$/.test(old.version)) {
+        storage.removeItem(`mitinta-auth:${old.version}`)
+      }
+    } catch { /* A damaged identity cannot authorize reusing a session. */ }
+    storage.removeItem(`mitinta-auth:${config.version}`)
+  }
+  storage.setItem('mitinta-backend-identity', identity)
+}
+
 export async function readBackendConfig(endpoint: string): Promise<BackendConfig> {
   const response = await fetch(endpoint, { cache: 'no-store', signal: AbortSignal.timeout(10000) })
   if (!response.ok) throw new Error('No se pudo verificar la conexión. Inténtalo de nuevo.')

@@ -1,6 +1,6 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import { readAuthCallback } from './authCallback'
-import { readBackendConfig, sameBackend, type BackendConfig } from './backendConfig'
+import { readBackendConfig, sameBackend, prepareBackendSession, type BackendConfig } from './backendConfig'
 
 const url = import.meta.env.VITE_SUPABASE_URL ?? ''
 const publishableKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY ?? ''
@@ -18,6 +18,7 @@ export async function initializeBackend() {
   if (!endpoint) return // Preserve the legacy GitHub Pages build during transition.
   const config = await readBackendConfig(endpoint)
   if (config.maintenance) throw new Error('MiTinta está en mantenimiento. Tus datos se conservan; vuelve a intentarlo más tarde.')
+  prepareBackendSession(config, window.localStorage)
   supabase = createClient(config.url, config.publishableKey, {
     auth: { storageKey: `mitinta-auth:${config.version}` },
     global: { fetch: async (input, init) => {
