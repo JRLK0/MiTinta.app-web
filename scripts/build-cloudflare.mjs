@@ -20,6 +20,8 @@ for (const args of [
   if (result.status !== 0) process.exit(result.status ?? 1)
 }
 await cp('privacy', 'dist/privacy', { recursive: true })
+await mkdir('dist/shared', { recursive: true })
+await cp('shared/tokens.css', 'dist/shared/tokens.css')
 if (!backend.url || !backend.publishableKey || !backend.version || typeof backend.maintenance !== 'boolean') {
   throw new Error('Configuración pública de backend incompleta')
 }
