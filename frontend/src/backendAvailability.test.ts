@@ -61,4 +61,5 @@ it('blocks private fetches during maintenance and backend change', async () => {
   fetchMock.mockResolvedValue(Response.json({ ...config, version: 'changed' }))
   await expect(client.request!('/private')).rejects.toThrow('cambiado')
   expect(window.location.reload).toHaveBeenCalledOnce()
+  expect(client.create).toHaveBeenCalledOnce()
 })

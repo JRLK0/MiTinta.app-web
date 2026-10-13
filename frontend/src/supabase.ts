@@ -21,6 +21,7 @@ export function subscribeBackend(listener: () => void) { listeners.add(listener)
 function updateBackend(state: BackendState) { backendState = state; listeners.forEach((listener) => listener()) }
 let initialization: Promise<void> | null = null
 let verification: Promise<BackendConfig> | null = null
+let activeConfig: BackendConfig | null = null
 
 function verifyBackend(endpoint: string) {
   // Share only in-flight verification. The next request always revalidates.
@@ -41,6 +42,15 @@ export function initializeBackend(): Promise<void> {
         return
       }
       prepareBackendSession(config, window.localStorage)
+      if (activeConfig && supabase) {
+        if (sameBackend(activeConfig, config)) {
+          updateBackend({ status: 'ready' })
+          return
+        }
+        updateBackend({ status: 'error', message: 'La conexión ha cambiado. Vuelve a iniciar sesión.' })
+        window.location.reload()
+        return
+      }
       const client = createClient(config.url, config.publishableKey, {
         auth: { storageKey: `mitinta-auth:${config.version}` },
         global: { fetch: async (input, init) => {
@@ -63,9 +73,8 @@ export function initializeBackend(): Promise<void> {
           return fetch(input, init)
         } },
       })
-      // Discard the previous in-memory client on explicit retry.
-      if (supabase) { supabase.auth.stopAutoRefresh(); await supabase.removeAllChannels() }
       supabase = client
+      activeConfig = config
       updateBackend({ status: 'ready' })
     } catch {
       updateBackend({ status: 'error', message: 'No se pudo verificar la conexión. El catálogo sigue disponible.' })
