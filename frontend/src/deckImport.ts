@@ -1,4 +1,4 @@
-import { checkedQuantity, validateImportText } from './importSecurity'
+import { checkedQuantity, validateImportText, MAX_IMPORT_ROWS } from './importSecurity'
 import Papa from 'papaparse'
 
 export type DeckRequirement = {
@@ -82,6 +82,7 @@ function parseCsvDeck(content: string): DeckRequirement[] {
     skipEmptyLines: 'greedy',
     transformHeader: normalizedHeader,
   })
+  if (result.data.length > MAX_IMPORT_ROWS) throw new Error('El archivo supera las 100.000 filas.')
   const rows = result.data.flatMap((row) => {
     const count = Number(firstValue(row, COUNT_HEADERS))
     if (Number.isNaN(count) || count <= 0) return []
@@ -106,7 +107,9 @@ function parseCsvDeck(content: string): DeckRequirement[] {
 
 function parseTextDeck(content: string): DeckRequirement[] {
   const ignoredSection = /^(deck|main deck|mainboard|sideboard|characters?|actions?|items?|locations?|songs?)\s*:?.*$/i
-  const rows = content.split(/\r?\n/).flatMap((rawLine) => {
+  const lines = content.split(/\r?\n/)
+  if (lines.filter((line) => line.trim()).length > MAX_IMPORT_ROWS) throw new Error('El archivo supera las 100.000 filas.')
+  const rows = lines.flatMap((rawLine) => {
     const line = rawLine.trim().replace(/^[-*]\s*/, '')
     if (!line || ignoredSection.test(line)) return []
     const match = line.match(/^(\d+)\s*x?\s+(.+)$/i)

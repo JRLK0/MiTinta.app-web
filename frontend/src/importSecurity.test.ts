@@ -8,6 +8,7 @@ it('rejects oversized files before reading and counts actual UTF-8 bytes', async
   expect(text).not.toHaveBeenCalled()
   expect(() => validateImportText('é'.repeat(MAX_IMPORT_BYTES / 2 + 1))).toThrow('10 MiB')
   expect(() => validateImportText('1 card\n'.repeat(100_001))).toThrow('100.000')
+  expect(() => parseDeck('1 Elsa\n'.repeat(100_000) + '1 Elsa')).toThrow('100.000')
 })
 
 it('rejects numeric overflow and duplicate totals before returning a deck', () => {
