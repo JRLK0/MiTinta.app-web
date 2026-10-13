@@ -141,11 +141,12 @@ export function mergeCatalogs(remote: CatalogCard[], bundled: CatalogCard[]) {
 }
 
 export function loadCatalog() {
-  catalogPromise ??= loadSupabaseCatalog().then(async (cards) => {
+  catalogPromise ??= (async () => {
     const bundled = await loadBundledCatalog()
-    if (bundled.length) return mergeCatalogs(cards, bundled)
-    return cards.length >= 3_000 ? cards : loadLorcastCatalog()
-  })
+    if (bundled.length) return bundled
+    const remote = await loadSupabaseCatalog().catch(() => [])
+    return remote.length >= 3_000 ? remote : loadLorcastCatalog()
+  })().catch((error) => { catalogPromise = null; throw error })
   return catalogPromise
 }
 

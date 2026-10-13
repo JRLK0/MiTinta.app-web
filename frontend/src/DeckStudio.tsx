@@ -1,3 +1,4 @@
+import { checkedQuantity, readImportFile, validateImportText, storageError } from './importSecurity'
 import { buildFormatChecker, formatName, replaceDeckPrinting, type DeckFormat } from './deckFormat'
 import './deckFormat.css'
 import { availableDeckCatalog } from './deckCatalog'
@@ -227,7 +228,7 @@ export function DeckStudio({ session, collection, ownershipForCard, onAddCopy }:
     setOpeningId(deck.id)
     const { data, error } = await loadAllPages<DeckEntry>(async (from, to) => await supabase.from('deck_entries').select('*').eq('deck_id', deck.id).order('card_id').range(from, to))
     setOpeningId(null)
-    if (error) return setMessage(error.message)
+    if (error) return setMessage(storageError(error))
     applyEditor({
       activeId: deck.id,
       name: deck.name,
@@ -282,7 +283,7 @@ export function DeckStudio({ session, collection, ownershipForCard, onAddCopy }:
       : await supabase.from('decks').insert(deckPayload).select().single()
     if (result.error) {
       setSaving(false)
-      return setMessage(result.error.message)
+      return setMessage(storageError(result.error))
     }
     const deck = result.data as Deck
     if (!currentActiveId) setActiveId(deck.id)
@@ -304,7 +305,7 @@ export function DeckStudio({ session, collection, ownershipForCard, onAddCopy }:
   async function deleteDeck() {
     if (!activeId || !window.confirm('¿Eliminar este mazo?')) return
     const { error } = await supabase.from('decks').delete().eq('id', activeId)
-    if (error) return setMessage(error.message)
+    if (error) return setMessage(storageError(error))
     applyEditor({ activeId: null, name: 'Mazo nuevo', description: '', isPublic: false, format: null, entries: [] }, true)
     setMessage('')
     setScreen('library')
@@ -323,7 +324,7 @@ export function DeckStudio({ session, collection, ownershipForCard, onAddCopy }:
     const file = event.target.files?.[0]
     if (!file) return
     try {
-      if (importDeck(await file.text())) setName(file.name.replace(/\.[^.]+$/, '') || 'Mazo importado')
+      if (importDeck(await readImportFile(file))) setName(file.name.replace(/\.[^.]+$/, '') || 'Mazo importado')
     } catch (error) {
       setImportError(error instanceof Error ? error.message : 'No se pudo importar el mazo.')
     }
@@ -336,6 +337,7 @@ export function DeckStudio({ session, collection, ownershipForCard, onAddCopy }:
     try {
       const content = await navigator.clipboard.readText()
       if (!content.trim()) throw new Error('El portapapeles no contiene una lista de cartas.')
+      validateImportText(content)
       setImportText(content)
     } catch (error) {
       setImportError(error instanceof Error && error.message ? error.message : 'No se pudo leer el portapapeles. Puedes pegar la lista manualmente en el campo inferior.')
@@ -379,9 +381,10 @@ export function DeckStudio({ session, collection, ownershipForCard, onAddCopy }:
     const imported: DeckEntry[] = []
     for (const entry of resolved) {
       const existing = imported.find(candidate => candidate.card_id === entry.card_id)
-      if (existing) existing.quantity += entry.quantity
+      if (existing) existing.quantity = checkedQuantity(existing.quantity + entry.quantity)
       else imported.push(entry)
     }
+    if (imported.length > 200) throw new Error('Un mazo admite como máximo 200 cartas distintas.')
     const copyIssues = validateDeck(imported)
     if (copyIssues.tooMany > 0) {
       setImportError(`No se ha importado el mazo. ${copyIssues.issues.filter(issue => issue.includes('copias; máximo')).join(' ')}`)
@@ -541,7 +544,7 @@ export function DeckStudio({ session, collection, ownershipForCard, onAddCopy }:
 
         </div>
       </div>
-      {importOpen && <div className="deck-modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setImportOpen(false) }}><section className="deck-import-modal" role="dialog" aria-modal="true" aria-labelledby="import-title"><header><div className="modal-icon"><FileUp /></div><div><p className="eyebrow">Añadir una lista</p><h2 id="import-title">Importar mazo</h2></div><button className="modal-close" onClick={() => setImportOpen(false)} aria-label="Cerrar importación"><X /></button></header><p className="import-intro">Pega una lista desde Dreamborn, InkDecks u otra web. También puedes subir un archivo <b>.txt</b> o <b>.csv</b>.</p><FormatSelector value={importFormat} onChange={setImportFormat} /><div className="import-source-actions"><button onClick={() => void pasteFromClipboard()} disabled={readingClipboard}><ClipboardPaste />{readingClipboard ? 'Leyendo…' : 'Pegar del portapapeles'}</button><label><FileUp />Elegir archivo<input type="file" accept=".txt,.csv" onChange={(event) => void importFile(event)} hidden /></label></div><label className="import-text-label"><span>Lista de cartas</span><small>Formato: cantidad + nombre de la carta</small><textarea autoFocus value={importText} onChange={(event) => { setImportText(event.target.value); setImportError('') }} placeholder={'4 Mickey Mouse - Brave Little Tailor\n4 Lumpy - Hunny Druid'} aria-label="Lista para importar" /></label>{importError && <p className="import-error" role="alert"><CircleAlert />{importError}</p>}<div className="import-example"><strong>Ejemplo compatible</strong><code>4 Mickey Mouse - Brave Little Tailor</code></div><footer><span>Al importar, se reemplazará la lista actual.</span><div><button className="cancel-command" onClick={() => setImportOpen(false)}>Cancelar</button><button className="save-command" onClick={submitImport} disabled={!importText.trim() || !importFormat || loadingCatalog || !!catalogError}><FileUp />Importar lista</button></div></footer></section></div>}
+      {importOpen && <div className="deck-modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setImportOpen(false) }}><section className="deck-import-modal" role="dialog" aria-modal="true" aria-labelledby="import-title"><header><div className="modal-icon"><FileUp /></div><div><p className="eyebrow">Añadir una lista</p><h2 id="import-title">Importar mazo</h2></div><button className="modal-close" onClick={() => setImportOpen(false)} aria-label="Cerrar importación"><X /></button></header><p className="import-intro">Pega una lista desde Dreamborn, InkDecks u otra web. También puedes subir un archivo <b>.txt</b> o <b>.csv</b>.</p><FormatSelector value={importFormat} onChange={setImportFormat} /><div className="import-source-actions"><button onClick={() => void pasteFromClipboard()} disabled={readingClipboard}><ClipboardPaste />{readingClipboard ? 'Leyendo…' : 'Pegar del portapapeles'}</button><label><FileUp />Elegir archivo<input type="file" accept=".txt,.csv" onChange={(event) => void importFile(event)} hidden /></label></div><label className="import-text-label"><span>Lista de cartas</span><small>Formato: cantidad + nombre de la carta</small><textarea autoFocus value={importText} onChange={(event) => { try { validateImportText(event.target.value); setImportText(event.target.value); setImportError('') } catch (error) { setImportError((error as Error).message) } }} placeholder={'4 Mickey Mouse - Brave Little Tailor\n4 Lumpy - Hunny Druid'} aria-label="Lista para importar" /></label>{importError && <p className="import-error" role="alert"><CircleAlert />{importError}</p>}<div className="import-example"><strong>Ejemplo compatible</strong><code>4 Mickey Mouse - Brave Little Tailor</code></div><footer><span>Al importar, se reemplazará la lista actual.</span><div><button className="cancel-command" onClick={() => setImportOpen(false)}>Cancelar</button><button className="save-command" onClick={submitImport} disabled={!importText.trim() || !importFormat || loadingCatalog || !!catalogError}><FileUp />Importar lista</button></div></footer></section></div>}
       {selectedCard && <CardViewer card={selectedCard} canToggleFoil={selectedCard.foilPriceEur != null} ownershipForCard={ownershipForCard} onAddCopy={onAddCopy} onClose={() => setSelectedCard(null)} />}
     </section>
   )

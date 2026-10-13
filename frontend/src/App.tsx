@@ -1,8 +1,9 @@
+import { checkedQuantity, externalCsvCell as csvCell, storageError } from './importSecurity'
 import { collectionCopyTarget } from './collectionCopyTarget'
 import { ThemeToggle } from '../../shared/ThemeToggle'
 import { FanCredit } from '../../shared/FanCredit'
 import { GuestDashboard } from './GuestDashboard'
-import { CSSProperties, FormEvent, useEffect, useMemo, useRef, useState } from 'react'
+import { CSSProperties, FormEvent, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import type { Session } from '@supabase/supabase-js'
 import {
   CircleUserRound,
@@ -22,7 +23,7 @@ import {
   ZoomIn,
   ZoomOut,
 } from 'lucide-react'
-import { initialAuthCallback, isConfigured, supabase } from './supabase'
+import { initialAuthCallback, isConfigured, supabase, initializeBackend, subscribeBackend, getBackendState } from './supabase'
 import { authCallbackMessage } from './authCallback'
 import { CatalogBrowser } from './CatalogBrowser'
 import { CardFilterBar, COMMON_SORT_OPTIONS } from './CardFilterBar'
@@ -77,14 +78,8 @@ function collectionEntryKey(entry: Pick<CollectionEntry, 'card_id' | 'language' 
   return `${entry.card_id}-${entry.language}-${entry.finish}`
 }
 
-function csvCell(value: string | number) {
-  const text = String(value)
-  return text.includes(',') || text.includes('"') || text.includes('\n')
-    ? `"${text.replaceAll('"', '""')}"`
-    : text
-}
-
 export default function App() {
+  const backend = useSyncExternalStore(subscribeBackend, getBackendState)
   const [session, setSession] = useState<Session | null>(null)
   const [checkingSession, setCheckingSession] = useState(true)
   const [passwordRecovery, setPasswordRecovery] = useState(initialAuthCallback.recovery && !initialAuthCallback.error)
@@ -92,7 +87,11 @@ export default function App() {
   const [callbackMessage, setCallbackMessage] = useState('')
 
   useEffect(() => {
+    if (backend.status !== 'ready') { setSession(null); setCheckingSession(false); return }
+    let active = true
+    setCheckingSession(true)
     supabase.auth.getSession().then(({ data }) => {
+      if (!active) return
       setPrivateLocalDataOwner(data.session?.user.id ?? null)
       setSession(data.session)
       const message = authCallbackMessage(initialAuthCallback, Boolean(data.session))
@@ -102,7 +101,7 @@ export default function App() {
         setShowAuth(true)
       }
       setCheckingSession(false)
-    })
+    }).catch(() => { if (active) { setSession(null); setCheckingSession(false) } })
     const { data } = supabase.auth.onAuthStateChange((event, nextSession) => {
       setPrivateLocalDataOwner(nextSession?.user.id ?? null)
       if (event === 'PASSWORD_RECOVERY') { setPasswordRecovery(true); setCallbackMessage('') }
@@ -111,25 +110,27 @@ export default function App() {
       setSession(nextSession)
       setCheckingSession(false)
     })
-    return () => data.subscription.unsubscribe()
-  }, [])
+    return () => { active = false; data.subscription.unsubscribe() }
+  }, [backend])
 
   const sharedDeckId = new URLSearchParams(window.location.search).get('deck')
-  if (checkingSession) return <LoadingScreen />
+  if (backend.status !== 'ready') return <>
+    <div className="backend-notice" role="status">
+      <span>{backend.status === 'checking' ? 'Comprobando conexión. Puedes consultar el catálogo.' : backend.message}</span>
+      {backend.status !== 'checking' && <button onClick={() => void initializeBackend()}>Volver a intentar</button>}
+    </div>
+    <GuestDashboard onSignIn={() => void initializeBackend()} /><FanCredit />
+  </>
+  if (checkingSession) return <><GuestDashboard onSignIn={() => setShowAuth(true)} /><FanCredit /></>
   if (callbackMessage && showAuth) return <><AuthScreen initialMessage={callbackMessage} onBack={() => { setShowAuth(false); setCallbackMessage('') }} /><FanCredit /></>
   if (passwordRecovery && session) return <><PasswordRecoveryScreen onComplete={() => setPasswordRecovery(false)} /><FanCredit /></>
-  if (!session) return <>{showAuth ? <AuthScreen onBack={() => setShowAuth(false)} /> : <GuestDashboard onSignIn={() => setShowAuth(true)} />}<FanCredit /></>
   if (sharedDeckId) return <><PublicDeck deckId={sharedDeckId} /><FanCredit /></>
+  if (!session) return <>{showAuth ? <AuthScreen onBack={() => setShowAuth(false)} /> : <GuestDashboard onSignIn={() => setShowAuth(true)} />}<FanCredit /></>
   return <><CollectionDashboard key={session.user.id} session={session} /><FanCredit /></>
 }
 
 function LoadingScreen() {
-  return (
-    <main className="center-screen" aria-live="polite">
-      <Cloud className="pulse" aria-hidden="true" />
-      <span>Abriendo tu colección</span>
-    </main>
-  )
+  return <main className="center-screen" aria-live="polite"><Cloud className="pulse" aria-hidden="true" /><span>Abriendo tu colección</span></main>
 }
 
 function AuthScreen({ onBack, initialMessage = '' }: { onBack: () => void; initialMessage?: string }) {
@@ -410,6 +411,7 @@ function CollectionDashboard({ session }: { session: Session }) {
   }, [collectionFilterCards, entryByKey, filters, finish, sort])
 
   function downloadDreambornCsv() {
+    try {
     const rows = entries.map((entry) => [
       entry.set_code,
       entry.collector_number,
@@ -428,6 +430,7 @@ function CollectionDashboard({ session }: { session: Session }) {
     link.click()
     link.remove()
     URL.revokeObjectURL(url)
+    } catch (error) { setError((error as Error).message) }
   }
 
   const stats = useMemo(() => {
@@ -442,6 +445,7 @@ function CollectionDashboard({ session }: { session: Session }) {
 
   async function changeQuantity(entry: CollectionEntry, delta: number) {
     const next = Math.max(0, entry.quantity + delta)
+    try { checkedQuantity(next, entry.quantity) } catch (error) { setError((error as Error).message); return }
     const key = collectionEntryKey(entry)
     if (delta > 0) localQuantityUpdates.current.set(key, next)
     setEntries((current) => current.map((item) => item === entry ? { ...item, quantity: next } : item).filter((item) => item.quantity > 0))
@@ -454,7 +458,7 @@ function CollectionDashboard({ session }: { session: Session }) {
       .eq('finish', entry.finish)
     if (updateError) {
       localQuantityUpdates.current.delete(key)
-      setError(updateError.message)
+      setError(storageError(updateError))
       void loadCollection()
     }
   }
@@ -479,7 +483,7 @@ function CollectionDashboard({ session }: { session: Session }) {
         card_id: card.id,
         language,
         finish,
-        quantity: (existing.get(`${card.id}-${language}-${finish}`) ?? 0) + quantity,
+        quantity: checkedQuantity((existing.get(`${card.id}-${language}-${finish}`) ?? 0) + quantity),
         card_name: card.name,
         card_version: card.version,
         set_code: card.set_code,
@@ -492,7 +496,7 @@ function CollectionDashboard({ session }: { session: Session }) {
         foil_price_eur: card.foil_price_eur,
       }))
       const { error: writeError } = await supabase.from('collection_entries').upsert(rows, { onConflict: 'user_id,card_id,language,finish' })
-      if (writeError) throw writeError
+      if (writeError) throw new Error(storageError(writeError))
       setStarterImportMessage(`${deck.name}: ${starterDeckTotals(deck).copies} cartas añadidas, incluidas ${starterDeckTotals(deck).foil} foil.`)
       setStarterImporterOpen(false)
       await loadCollection()
@@ -522,7 +526,7 @@ function CollectionDashboard({ session }: { session: Session }) {
       await loadCollection()
       throw new Error('No quedan copias de este acabado para restar.')
     }
-    const quantity = Math.max(0, (existing?.quantity ?? 0) + delta)
+    const quantity = checkedQuantity(Math.max(0, (existing?.quantity ?? 0) + delta), existing?.quantity ?? 0)
     const key = collectionEntryKey(identity)
     localQuantityUpdates.current.set(key, quantity)
     const { error: writeError } = existing
@@ -548,7 +552,7 @@ function CollectionDashboard({ session }: { session: Session }) {
       })
     if (writeError) {
       localQuantityUpdates.current.delete(key)
-      throw writeError
+      throw new Error(storageError(writeError))
     }
     await loadCollection()
   }

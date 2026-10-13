@@ -1,3 +1,4 @@
+import { checkedQuantity, validateImportText } from './importSecurity'
 import Papa from 'papaparse'
 
 export type DeckRequirement = {
@@ -70,7 +71,7 @@ function mergeRequirements(rows: DeckRequirement[]) {
   const merged = new Map<string, DeckRequirement>()
   rows.forEach((row) => {
     const previous = merged.get(row.key)
-    merged.set(row.key, previous ? { ...previous, count: previous.count + row.count } : row)
+    merged.set(row.key, previous ? { ...previous, count: checkedQuantity(previous.count + row.count) } : row)
   })
   return Array.from(merged.values())
 }
@@ -83,7 +84,8 @@ function parseCsvDeck(content: string): DeckRequirement[] {
   })
   const rows = result.data.flatMap((row) => {
     const count = Number(firstValue(row, COUNT_HEADERS))
-    if (!Number.isInteger(count) || count <= 0) return []
+    if (Number.isNaN(count) || count <= 0) return []
+    checkedQuantity(count)
     const name = firstValue(row, NAME_HEADERS)
     const setCode = firstValue(row, SET_HEADERS)
     const collectorNumber = firstValue(row, NUMBER_HEADERS)
@@ -112,12 +114,14 @@ function parseTextDeck(content: string): DeckRequirement[] {
     const count = Number(match[1])
     const name = match[2].trim()
     if (!name || count <= 0) return []
+    checkedQuantity(count)
     return [{ key: `name:${normalizedText(name)}`, name, count }]
   })
   return mergeRequirements(rows)
 }
 
 export function parseDeck(content: string): DeckRequirement[] {
+  validateImportText(content)
   const trimmed = content.trim()
   if (!trimmed) throw new Error('Pega una lista o selecciona un archivo de mazo.')
   const firstLine = trimmed.split(/\r?\n/, 1)[0]
@@ -155,7 +159,7 @@ export function analyzeDeck(
     const groupKey = cards.length > 0 ? `card:${nameKey}` : requirement.key
     const previous = resolved.get(groupKey)
     if (previous) {
-      previous.requirement.count += requirement.count
+      previous.requirement.count = checkedQuantity(previous.requirement.count + requirement.count)
     } else {
       resolved.set(groupKey, {
         requirement: { ...requirement },

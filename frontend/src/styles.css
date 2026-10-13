@@ -1777,3 +1777,6 @@ button:disabled { cursor: not-allowed; }
 .public-album-list strong { font-size: 16px; }
 .album-back { display: flex; align-items: center; gap: 8px; margin-bottom: 16px; min-height: 44px; }
 @media (max-width: 720px) { .guest-shell .app-bottom-nav { grid-template-columns: repeat(4, 1fr); } .guest-shell .app-bottom-nav button { font-size: 11px; padding-inline: 4px; } }
+
+.backend-notice { display: flex; align-items: center; justify-content: center; gap: 12px; flex-wrap: wrap; padding: 12px 20px; color: var(--ink); background: var(--surface-raised); border-bottom: 1px solid var(--line); font-size: 14px; }
+.backend-notice button { padding: 8px 12px; border: 1px solid var(--line); border-radius: 10px; color: var(--accent); background: var(--surface); cursor: pointer; }
