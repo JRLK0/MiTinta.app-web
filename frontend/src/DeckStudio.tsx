@@ -1,3 +1,4 @@
+import { appUrl, setRouteParameter, useAppLocation } from './navigation'
 import { checkedQuantity, readImportFile, validateImportText, storageError } from './importSecurity'
 import { buildFormatChecker, formatName, replaceDeckPrinting, type DeckFormat } from './deckFormat'
 import './deckFormat.css'
@@ -107,7 +108,9 @@ export function DeckStudio({ session, collection, ownershipForCard, onAddCopy }:
   const [catalogError, setCatalogError] = useState('')
   const [loadingCatalog, setLoadingCatalog] = useState(true)
   const [decks, setDecks] = useState<Deck[]>([])
+  const { view: routeView, editor: editorRoute } = useAppLocation()
   const [screen, setScreen] = useState<'library' | 'format' | 'editor'>('library')
+  const loadedEditorRoute = useRef<string | null>(null)
   const [libraryEntries, setLibraryEntries] = useState<DeckEntry[]>([])
   const [libraryLoading, setLibraryLoading] = useState(true)
   const [libraryError, setLibraryError] = useState('')
@@ -126,6 +129,8 @@ export function DeckStudio({ session, collection, ownershipForCard, onAddCopy }:
   const [filters, setFilters] = useState<CardFilterState>({ ...EMPTY_CARD_FILTERS })
   const [sort, setSort] = useState<CommonSortMode>('set')
   const [onlyAvailable, setOnlyAvailable] = useState(false)
+  const [catalogLimit, setCatalogLimit] = useState(120)
+  useEffect(() => setCatalogLimit(120), [filters, sort, onlyAvailable, format])
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState(restoredDraft ? 'Borrador local recuperado.' : '')
   const [importOpen, setImportOpen] = useState(false)
@@ -153,10 +158,7 @@ export function DeckStudio({ session, collection, ownershipForCard, onAddCopy }:
       window.localStorage.removeItem(draftKey)
       return
     }
-    const timer = window.setTimeout(() => {
-      writePrivateLocalData(session.user.id, draftKey, serializeDeckDraft(session.user.id, editorState))
-    }, 350)
-    return () => window.clearTimeout(timer)
+    writePrivateLocalData(session.user.id, draftKey, serializeDeckDraft(session.user.id, editorState))
   }, [draftKey, editorState, isDirty, session.user.id])
 
   useEffect(() => {
@@ -194,6 +196,24 @@ export function DeckStudio({ session, collection, ownershipForCard, onAddCopy }:
     return () => { document.removeEventListener('pointerdown', closePanels); document.removeEventListener('keydown', closePanels) }
   }, [])
 
+  useEffect(() => {
+    if (routeView !== 'decks') return
+    if (!editorRoute) { setScreen('library'); loadedEditorRoute.current = null; return }
+    if (editorRoute === 'new') { setScreen('format'); return }
+    if (editorRoute === 'draft') { setScreen(format ? 'editor' : 'format'); return }
+    if (editorRoute === activeId) { setScreen('editor'); return }
+    if (libraryLoading || loadedEditorRoute.current === editorRoute) return
+    const deck = decks.find(candidate => candidate.id === editorRoute)
+    if (!deck) {
+      if (libraryError) return
+      setMessage('No se encontró ese mazo en tu cuenta. Elige uno de tu biblioteca.')
+      setRouteParameter('editor', null, true)
+      return
+    }
+    loadedEditorRoute.current = editorRoute
+    void openDeck(deck, false)
+  }, [routeView, editorRoute, libraryLoading, decks])
+
   function applyEditor(next: DeckEditorState, saved: boolean) {
     setActiveId(next.activeId)
     setBaseRevision(next.baseRevision ?? null)
@@ -228,12 +248,12 @@ export function DeckStudio({ session, collection, ownershipForCard, onAddCopy }:
     } finally { setLibraryLoading(false) }
   }
 
-  async function openDeck(deck: Deck) {
-    if (!canDiscardDraft()) return
+  async function openDeck(deck: Deck, updateRoute = true) {
+    if (!canDiscardDraft()) { if (!updateRoute) setRouteParameter('editor', null, true); return }
     setOpeningId(deck.id)
     const { data, error } = await supabase.rpc('get_own_deck_snapshot', { target_deck_id: deck.id })
     setOpeningId(null)
-    if (error) return setMessage(storageError(error))
+    if (error) { setMessage(storageError(error)); if (!updateRoute) setRouteParameter('editor', null, true); return }
     const snapshot = data as DeckSnapshot
     applyEditor({
       activeId: snapshot.deck.id,
@@ -246,6 +266,7 @@ export function DeckStudio({ session, collection, ownershipForCard, onAddCopy }:
     }, true)
     setMessage('')
     setScreen('editor')
+    if (updateRoute) setRouteParameter('editor', deck.id)
     setMobilePane('catalog')
   }
 
@@ -254,12 +275,14 @@ export function DeckStudio({ session, collection, ownershipForCard, onAddCopy }:
     applyEditor({ activeId: null, name: 'Mazo nuevo', description: '', isPublic: false, format: null, entries: [] }, true)
     setMessage('')
     setScreen('format')
+    setRouteParameter('editor', 'new')
   }
 
   function chooseFormat(value: DeckFormat) {
     setFormat(value)
     setMobilePane('catalog')
     setScreen('editor')
+    setRouteParameter('editor', 'draft')
   }
 
   function changeCard(card: CatalogCard, delta: number) {
@@ -295,6 +318,7 @@ export function DeckStudio({ session, collection, ownershipForCard, onAddCopy }:
       if (error) return setMessage((error.code === '40001' || error.code === 'PT409') ? 'El mazo cambió desde que lo abriste. Tu borrador está conservado: exporta tus cambios y vuelve a abrir el mazo para revisarlos.' : storageError(error))
       const saved = data as DeckSnapshot
       applyEditor({ ...editorState, activeId: saved.deck.id, baseRevision: saved.revision, name: saved.deck.name, description: saved.deck.description, isPublic: saved.deck.is_public, entries: saved.entries }, true)
+      setRouteParameter('editor', saved.deck.id, true)
       pendingSave.current = null
       setMessage(formatIssues.length ? `Borrador guardado · ${formatIssues.length} cartas pendientes para ${formatName(format)}.` : 'Mazo guardado.')
       await loadDecks()
@@ -314,7 +338,7 @@ export function DeckStudio({ session, collection, ownershipForCard, onAddCopy }:
       if (error) return setMessage((error.code === '40001' || error.code === 'PT409') ? 'El mazo cambió. Vuelve a abrirlo antes de eliminarlo.' : storageError(error))
       pendingDelete.current = null
       applyEditor({ activeId: null, baseRevision: null, name: 'Mazo nuevo', description: '', isPublic: false, format: null, entries: [] }, true)
-      setMessage(''); setScreen('library')
+      setMessage(''); setScreen('library'); setRouteParameter('editor', null, true)
       await loadDecks()
     } catch { setMessage('No se pudo confirmar la eliminación. Puedes reintentarlo.') }
     finally { setSaving(false) }
@@ -441,20 +465,20 @@ export function DeckStudio({ session, collection, ownershipForCard, onAddCopy }:
       .map((card) => catalogById.get(card.id))
       .filter((card): card is CatalogCard => card != null)
   }, [availability, catalogById, filterableCatalog, filters, onlyAvailable, sort])
-  const visibleCatalog = matchingCatalog.slice(0, 120)
+  const visibleCatalog = matchingCatalog.slice(0, catalogLimit)
   const checkFormat = useMemo(() => buildFormatChecker(catalog, format ?? 'core'), [catalog, format])
   const formatIssues = useMemo(() => format && !loadingCatalog && !catalogError ? entries.filter(entry => !checkFormat(entry).legal) : [], [entries, checkFormat, format, loadingCatalog, catalogError])
   const formatReady = !!format && !loadingCatalog && !catalogError
   const rules = useMemo(() => validateDeck(entries), [entries])
   const inkNames = rules.baseInks.map(ink => INK_OPTIONS.find(option => option.value === ink.toUpperCase())?.label ?? ink).join(' + ')
-  const catalogScope = [format === 'core' ? 'Core · ediciones vigentes' : format === 'infinity' ? 'Infinity · cartas válidas' : '', rules.hunnyEnabled ? `${inkNames} + otros personajes Hunny` : rules.inks.length >= 2 ? `Solo ${inkNames}` : ''].filter(Boolean).join(' · ')
+  const catalogScope = rules.hunnyEnabled ? `${inkNames} + otros personajes Hunny` : rules.inks.length >= 2 ? `Solo ${inkNames}` : ''
   const missing = Array.from(availability.values()).reduce((sum, card) => sum + card.missing, 0)
   const ownedInDeck = Math.max(0, rules.total - missing)
   const priceSummary = useMemo(() => buildDeckPriceSummary(collection, entries), [collection, entries])
 
   if (screen === 'library') return <section className="deck-library-page" aria-label="Mis mazos">
     <header className="deck-library-header"><div><h1>Mis mazos</h1><p>Elige un mazo para verlo y editarlo.</p></div><button className="save-command" onClick={newDeck}><Plus />Nuevo mazo</button></header>
-    {isDirty && <div className="deck-resume"><div><strong>{name}</strong><span>Tienes un borrador sin guardar.</span></div><button onClick={() => setScreen(activeId || format ? 'editor' : 'format')}>Continuar borrador<ArrowRight /></button></div>}
+    {isDirty && <div className="deck-resume"><div><strong>{name}</strong><span>Tienes un borrador sin guardar.</span></div><button onClick={() => setRouteParameter('editor', activeId ?? (format ? 'draft' : 'new'))}>Continuar borrador<ArrowRight /></button></div>}
     {message && <p className="notice" role="status">{message}</p>}
     {libraryError && <div className="notice error" role="alert">No se pudieron cargar todos los datos: {libraryError}<button onClick={() => void loadDecks()}>Reintentar</button></div>}
     {libraryLoading ? <p className="deck-library-loading" role="status">Cargando tus mazos…</p> : decks.length ? <div className="deck-library-grid">{decks.map(deck => {
@@ -467,18 +491,18 @@ export function DeckStudio({ session, collection, ownershipForCard, onAddCopy }:
   </section>
 
   if (screen === 'format') return <section className="deck-format-page">
-    <button className="deck-back" onClick={() => setScreen('library')}><ArrowLeft />Mis mazos</button>
+    <button className="deck-back" onClick={() => setRouteParameter('editor', null)}><ArrowLeft />Mis mazos</button>
     <div className="deck-format-intro"><h1>¿Qué formato quieres construir?</h1><p>El formato determina qué cartas puedes añadir. Podrás cambiarlo en el editor.</p></div>
     <div className="deck-format-choices"><button onClick={() => chooseFormat('core')}><span>Core</span><p>Construye con las ediciones vigentes y las reimpresiones válidas.</p><strong>Crear en Core<ArrowRight /></strong></button><button onClick={() => chooseFormat('infinity')}><span>Infinity</span><p>Construye con cartas de todos los sets, respetando la lista de prohibidas.</p><strong>Crear en Infinity<ArrowRight /></strong></button></div>
   </section>
 
   return (
     <section ref={workspace} className="studio-shell deck-workspace">
-      <div className="deck-editor-navigation"><button className="deck-back" onClick={() => setScreen('library')}><ArrowLeft />Mis mazos</button><span>{activeId ? 'Editar mazo' : 'Nuevo mazo'}</span></div>
+      <div className="deck-editor-navigation"><button className="deck-back" onClick={() => setRouteParameter('editor', null)}><ArrowLeft />Mis mazos</button><span>{activeId ? 'Editar mazo' : 'Nuevo mazo'}</span></div>
 
       <div className="deck-editor">
         <div className="deck-editor-head">
-          <div className="deck-fields"><input className="deck-title-input" value={name} onChange={(event) => setName(event.target.value)} maxLength={80} aria-label="Nombre del mazo" /><span className={`deck-save-state${isDirty ? ' dirty' : ''}`}>{isDirty ? 'Cambios sin guardar' : 'Guardado'}</span></div>
+          <div className="deck-fields"><label className="deck-name-label" htmlFor="deck-name">Nombre del mazo<input id="deck-name" className="deck-title-input" value={name} onChange={(event) => setName(event.target.value)} maxLength={80} aria-describedby="deck-name-help" placeholder="Escribe el nombre de tu mazo" /></label><span id="deck-name-help" className="deck-name-help">Cambia el nombre y pulsa Guardar.</span><span className={`deck-save-state${isDirty ? ' dirty' : ''}`}>{isDirty ? 'Cambios sin guardar' : 'Guardado'}</span></div>
           <div className="deck-commands">
             <button className="import-command" onClick={openImporter}><FileUp />Importar</button>
             <details className="deck-options"><summary>Opciones<ChevronDown /></summary><div className="deck-options-panel"><label>Descripción<input value={description} onChange={(event) => setDescription(event.target.value)} maxLength={1000} placeholder="Añade una descripción…" /></label>            <button className="icon-command" onClick={downloadDeck} disabled={entries.length === 0} title="Exportar mazo" aria-label="Exportar mazo"><Download />Exportar lista</button>
@@ -489,7 +513,7 @@ export function DeckStudio({ session, collection, ownershipForCard, onAddCopy }:
             <button className="save-command" onClick={() => void saveDeck()} disabled={saving}><Save />{saving ? 'Guardando' : 'Guardar'}</button>
           </div>
         </div>
-        <div className="deck-build-toolbar"><FormatSelector value={format} onChange={setFormat} /><span className="deck-total"><strong>{rules.total}</strong> / 60 cartas</span><details className="deck-insights"><summary>Detalles<ChevronDown /></summary><div className="deck-insights-panel">
+        <div className="deck-build-toolbar"><FormatSelector value={format} onChange={setFormat} /><span className="deck-total"><strong>{rules.total}</strong> / 60 cartas</span><details className="deck-insights"><summary aria-label="Estado y estadísticas">Estado<span className="deck-insights-long-label"> y estadísticas</span><ChevronDown /></summary><div className="deck-insights-panel">
 
         <div className="deck-overview" aria-label="Estado del mazo">
 
@@ -520,7 +544,7 @@ export function DeckStudio({ session, collection, ownershipForCard, onAddCopy }:
             <div className="catalog-picker-heading"><div><h3>Añadir cartas</h3></div><p><i className="legend-owned" />En tu colección <i className="legend-missing" />No disponible</p></div>
             {catalogScope && <p className="deck-catalog-scope">{catalogScope}</p>}
             <CardFilterBar compact cards={filterableCatalog} filters={filters} onFiltersChange={setFilters} sort={sort} sortOptions={COMMON_SORT_OPTIONS} onSortChange={(value) => setSort(value as CommonSortMode)} resultCount={matchingCatalog.length} totalCount={eligibleCatalog.length} extraActiveCount={onlyAvailable ? 1 : 0} extraActiveLabel="Solo disponibles" onReset={() => setOnlyAvailable(false)} specificControls={<div className="specific-filter-control"><span>Colección propia</span><div><button className={!onlyAvailable ? 'active' : ''} onClick={() => setOnlyAvailable(false)}>Todas</button><button className={onlyAvailable ? 'active' : ''} onClick={() => setOnlyAvailable(true)}>Solo disponibles</button></div></div>} />
-            {matchingCatalog.length > 120 && <p className="deck-catalog-scope">Mostrando las primeras 120 cartas. Afina la búsqueda para ver el resto.</p>}{!loadingCatalog && !catalogError && matchingCatalog.length === 0 && <p className="picker-loading">No hay cartas compatibles con el formato, las tintas y los filtros elegidos.</p>}{catalogError && <p className="notice error">{catalogError}</p>}
+            {!loadingCatalog && !catalogError && matchingCatalog.length === 0 && <p className="picker-loading">No hay cartas compatibles con el formato, las tintas y los filtros elegidos.</p>}{catalogError && <p className="notice error">{catalogError}</p>}
             {loadingCatalog ? <p className="picker-loading">Descargando catálogo…</p> : <div className="picker-grid">{visibleCatalog.map((card) => {
               const cardAvailability = availability.get(deckAvailabilityKey(card.name, card.version)) ?? { owned: 0, required: 0, remaining: 0, missing: 0 }
               const copyState = deckCopyState(entries, entryFromCard(card))
@@ -528,6 +552,7 @@ export function DeckStudio({ session, collection, ownershipForCard, onAddCopy }:
               const ownership = cardAvailability.remaining > 0 ? 'available' : cardAvailability.owned > 0 ? 'used' : 'unowned'
               return <article key={card.id} className={`picker-card ownership-${ownership}`}><div className={`ownership-badge ${ownership}`}>{ownership === 'available' ? <><CheckCircle2 />Tienes {cardAvailability.remaining} disponible{cardAvailability.remaining === 1 ? '' : 's'}</> : ownership === 'used' ? 'Copias ya usadas' : 'No la tienes'}</div><button className="picker-preview" onClick={() => setSelectedCard({ id: card.id, name: card.name, version: card.version, imageUrl: card.image_url, setCode: card.set_code, setName: card.set_name, collectorNumber: card.collector_number, rarity: card.rarity, ink: card.ink, normalPriceEur: card.normal_price_eur, foilPriceEur: card.foil_price_eur })} aria-label={`Ver ${cardTitle(card)}`}>{card.image_url ? <img src={card.image_url} alt={cardTitle(card)} loading="lazy" /> : <span className="deck-thumb"><Sparkles /></span>}</button><button disabled={!copyState.canAdd} onClick={() => changeCard(card, 1)} title={copyState.canAdd ? `Añadir ${cardTitle(card)}` : `Máximo ${copyState.limit} copias entre todas las ediciones`} aria-label={`Añadir ${cardTitle(card)}`}><Plus /></button><div><strong>{card.name}</strong><span>{card.version}</span>{legality && !legality.legal && <small className="picker-format-warning" title={legality.message}>{legality.kind === 'banned' ? 'Prohibida' : legality.kind === 'unreleased' ? 'Pendiente de lanzamiento' : `Fuera de ${formatName(format!)}`}</small>}<small className={`deck-copy-count${!copyState.canAdd ? ' at-limit' : ''}`}>{copyState.count}/{Number.isFinite(copyState.limit) ? copyState.limit : '∞'} en el mazo{!copyState.canAdd ? ' · Máximo' : ''}</small></div></article>
             })}</div>}
+            {matchingCatalog.length > catalogLimit && <button className="deck-load-more" onClick={() => setCatalogLimit(value => value + 120)}>Mostrar más cartas ({Math.min(catalogLimit, matchingCatalog.length)} de {matchingCatalog.length})</button>}
           </div>
           <div className="deck-stack">
             <div className="section-title"><div><h3>Tu lista</h3><span>{entries.length} cartas distintas</span></div><DeckInkCrest inks={rules.inks} baseInks={rules.baseInks} invalid={!rules.inksValid} /></div>
@@ -581,7 +606,7 @@ export function PublicDeck({ deckId }: { deckId: string }) {
     const anchor = document.createElement('a'); anchor.href = url; anchor.download = `${deck?.name ?? 'mazo'}.txt`; anchor.click(); URL.revokeObjectURL(url)
   }
 
-  if (error) return <main className="public-deck-state"><CircleAlert /><h1>{error}</h1><a href={import.meta.env.BASE_URL}>Volver a Lorcana Lector</a></main>
+  if (error) return <main className="public-deck-state"><CircleAlert /><h1>{error}</h1><a href={appUrl('decks')}>Volver a mis mazos</a></main>
   if (!deck) return <main className="public-deck-state"><Sparkles className="pulse" /><span>Abriendo mazo</span></main>
   const rules = validateDeck(entries)
   const deckValue = entries.reduce((sum, entry) => sum + (entry.normal_price_eur ?? 0) * entry.quantity, 0)

@@ -1,3 +1,6 @@
+import { AppNavigation } from './AppNavigation'
+import { navigate, cancelSignIn, readView, appUrl, useAppLocation, viewLabels, type AppView } from './navigation'
+import { PublicAlbums } from './PublicAlbums'
 import { checkedQuantity, externalCsvCell as csvCell, storageError } from './importSecurity'
 import { collectionCopyTarget } from './collectionCopyTarget'
 import { ThemeToggle } from '../../shared/ThemeToggle'
@@ -11,8 +14,6 @@ import {
   Bot,
   Cloud,
   Layers3,
-  LibraryBig,
-  ListChecks,
   Rows3,
   LogOut,
   Minus,
@@ -64,7 +65,6 @@ export type CollectionEntry = {
 
 type FinishFilter = 'ALL' | 'NORMAL' | 'FOIL'
 type CollectionSortMode = CommonSortMode | 'recent' | 'quantity'
-type CollectionView = 'collection' | 'catalog' | 'decks'
 type CollectionMode = 'cards' | 'sets'
 
 const CARD_SIZE_MIN = 135
@@ -85,8 +85,10 @@ export default function App() {
   const [session, setSession] = useState<Session | null>(null)
   const [checkingSession, setCheckingSession] = useState(true)
   const [passwordRecovery, setPasswordRecovery] = useState(initialAuthCallback.recovery && !initialAuthCallback.error)
-  const [showAuth, setShowAuth] = useState(initialAuthCallback.error)
   const [callbackMessage, setCallbackMessage] = useState('')
+  const location = useAppLocation()
+  const showAuth = location.auth || initialAuthCallback.error && Boolean(callbackMessage)
+  const setShowAuth = (open: boolean) => navigate(readView(window.location.search), open, !open)
 
   useEffect(() => {
     if (backend.status !== 'ready') { setSession(null); setCheckingSession(false); return }
@@ -108,27 +110,33 @@ export default function App() {
       setPrivateLocalDataOwner(nextSession?.user.id ?? null)
       if (event === 'PASSWORD_RECOVERY') { setPasswordRecovery(true); setCallbackMessage('') }
       else if (event === 'SIGNED_IN') { setCallbackMessage(''); setShowAuth(false) }
-      else if (event === 'SIGNED_OUT') { setPasswordRecovery(false); setShowAuth(false) }
+      else if (event === 'SIGNED_OUT') { setPasswordRecovery(false); navigate('catalog', false, true) }
       setSession(nextSession)
       setCheckingSession(false)
     })
     return () => { active = false; data.subscription.unsubscribe() }
   }, [backend])
 
+  useEffect(() => {
+    document.title = `MiTinta · ${!session && (showAuth || location.view === 'collection' || location.view === 'decks') ? 'Iniciar sesión' : viewLabels[location.view]}`
+  }, [location.view, showAuth, session])
+
+  const requireSignIn = () => setShowAuth(true)
+  const goToView = (view: AppView) => navigate(view, !session && (view === 'collection' || view === 'decks'))
   const sharedDeckId = new URLSearchParams(window.location.search).get('deck')
   if (backend.status !== 'ready') return <>
     <div className="backend-notice" role="status">
       <span>{backend.status === 'checking' ? 'Comprobando conexión. Puedes consultar el catálogo.' : backend.message}</span>
       {backend.status !== 'checking' && <button onClick={() => void initializeBackend()}>Volver a intentar</button>}
     </div>
-    <GuestDashboard onSignIn={() => void initializeBackend()} /><FanCredit />
+    <GuestDashboard onSignIn={() => { setShowAuth(true); void initializeBackend() }} /><FanCredit />
   </>
-  if (checkingSession) return <><GuestDashboard onSignIn={() => setShowAuth(true)} /><FanCredit /></>
+  if (checkingSession) return <LoadingScreen />
   if (callbackMessage && showAuth) return <><AuthScreen initialMessage={callbackMessage} onBack={() => { setShowAuth(false); setCallbackMessage('') }} /><FanCredit /></>
   if (passwordRecovery && session) return <><PasswordRecoveryScreen onComplete={() => setPasswordRecovery(false)} /><FanCredit /></>
   if (sharedDeckId) return <><PublicDeck deckId={sharedDeckId} /><FanCredit /></>
-  if (!session) return <>{showAuth ? <AuthScreen onBack={() => setShowAuth(false)} /> : <GuestDashboard onSignIn={() => setShowAuth(true)} />}<FanCredit /></>
-  return <><CollectionDashboard key={session.user.id} session={session} /><FanCredit /></>
+  if (!session) return <>{showAuth || location.view === 'collection' || location.view === 'decks' ? <AuthScreen onBack={cancelSignIn} /> : <GuestDashboard onSignIn={requireSignIn} />}<FanCredit /></>
+  return <><CollectionDashboard key={session.user.id} session={session} activeView={location.view} setActiveView={goToView} /><FanCredit /></>
 }
 
 function LoadingScreen() {
@@ -152,7 +160,7 @@ function AuthScreen({ onBack, initialMessage = '' }: { onBack: () => void; initi
       ? await supabase.auth.signUp({
           email,
           password,
-          options: { emailRedirectTo: `${window.location.origin}${import.meta.env.BASE_URL}` },
+          options: { emailRedirectTo: `${window.location.origin}${appUrl(readView(window.location.search))}` },
         })
       : await supabase.auth.signInWithPassword({ email, password })
     setBusy(false)
@@ -172,7 +180,7 @@ function AuthScreen({ onBack, initialMessage = '' }: { onBack: () => void; initi
     setBusy(true)
     setMessage('')
     const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
-      redirectTo: `${window.location.origin}${import.meta.env.BASE_URL}`,
+      redirectTo: `${window.location.origin}${appUrl(readView(window.location.search))}`,
     })
     setBusy(false)
     setMessage(error ? error.message : 'Te hemos enviado un enlace para cambiar la contraseña.')
@@ -190,8 +198,8 @@ function AuthScreen({ onBack, initialMessage = '' }: { onBack: () => void; initi
             <h1 id="auth-title">MiTinta</h1>
           </div>
         </div>
-        <p className="auth-intro">Tu colección de Lorcana, siempre contigo.</p>
-        <button type="button" className="text-command" onClick={onBack}>Volver al catálogo sin cuenta</button>
+        <p className="auth-intro">{readView(window.location.search) === 'decks' ? 'Inicia sesión para crear y editar tus mazos.' : readView(window.location.search) === 'collection' ? 'Inicia sesión para ver y gestionar tu colección.' : 'Tu colección de Lorcana, siempre contigo.'}</p>
+        <button type="button" className="text-command" onClick={onBack}>Volver a explorar</button>
         {!isConfigured && (
           <p className="notice error">Falta configurar la conexión pública con Supabase.</p>
         )}
@@ -210,7 +218,7 @@ function AuthScreen({ onBack, initialMessage = '' }: { onBack: () => void; initi
           </label>
           {message && <p className={messageIsSuccess ? 'notice success' : 'notice error'}>{message}</p>}
           <button className="primary-command" disabled={busy || !isConfigured}>
-            {busy ? 'Conectando…' : createAccount ? 'Crear mi cuenta' : 'Entrar en mi colección'}
+            {busy ? 'Conectando…' : createAccount ? 'Crear mi cuenta' : 'Entrar y continuar'}
           </button>
           {!createAccount && <button type="button" className="text-command" onClick={() => void requestPasswordReset()} disabled={busy || !isConfigured}>He olvidado mi contraseña</button>}
         </form>
@@ -257,7 +265,7 @@ function PasswordRecoveryScreen({ onComplete }: { onComplete: () => void }) {
   </main>
 }
 
-function CollectionDashboard({ session }: { session: Session }) {
+function CollectionDashboard({ session, activeView, setActiveView }: { session: Session; activeView: AppView; setActiveView: (view: AppView) => void }) {
   const [aiConnectionsOpen, setAIConnectionsOpen] = useState(false)
   const [entries, setEntries] = useState<CollectionEntry[]>([])
   const [catalogMetadata, setCatalogMetadata] = useState<CatalogCard[]>([])
@@ -266,7 +274,6 @@ function CollectionDashboard({ session }: { session: Session }) {
   const [filters, setFilters] = useState<CardFilterState>({ ...EMPTY_CARD_FILTERS })
   const [finish, setFinish] = useState<FinishFilter>('ALL')
   const [sort, setSort] = useState<CollectionSortMode>('recent')
-  const [activeView, setActiveView] = useState<CollectionView>('collection')
   const [collectionMode, setCollectionMode] = useState<CollectionMode>('cards')
   const [starterImporterOpen, setStarterImporterOpen] = useState(false)
   const [starterImportBusy, setStarterImportBusy] = useState(false)
@@ -574,20 +581,16 @@ function CollectionDashboard({ session }: { session: Session }) {
     await supabase.auth.signOut({ scope: 'local' })
   }
 
-  const activeViewLabel = activeView === 'collection' ? 'Colección' : activeView === 'catalog' ? 'Catálogo' : 'Mazos'
+  const activeViewLabel = viewLabels[activeView]
 
   return (
     <div className="app-shell">
       <header className="topbar">
         <div className="brand-lockup compact">
           <span className="brand-mark"><img src={`${import.meta.env.BASE_URL}ink-icons/amethyst.png`} alt="" width="30" height="30" /></span>
-          <div><span className="app-brand-name">MiTinta</span><strong className="current-view-label">{activeViewLabel}<i title="Sincronización activa" aria-label="Sincronización activa" /></strong></div>
+          <div><a className="app-brand-name" href="/" aria-label="MiTinta, inicio">MiTinta</a><strong className="current-view-label">{activeViewLabel}<i title="Sincronización activa" aria-label="Sincronización activa" /></strong></div>
         </div>
-          <nav className="view-tabs desktop-view-tabs" aria-label="Vistas de la cuenta">
-            <button className={activeView === 'collection' ? 'active' : ''} onClick={() => setActiveView('collection')}><Layers3 aria-hidden="true" />Colección</button>
-            <button className={activeView === 'catalog' ? 'active' : ''} onClick={() => setActiveView('catalog')}><LibraryBig aria-hidden="true" />Catálogo</button>
-            <button className={activeView === 'decks' ? 'active' : ''} onClick={() => setActiveView('decks')}><ListChecks aria-hidden="true" />Mazos</button>
-          </nav>
+          <nav className="view-tabs desktop-view-tabs" aria-label="Navegación principal"><AppNavigation view={activeView} onNavigate={setActiveView} /></nav>
         <div className="header-actions"><ThemeToggle /><AccountMenu
           email={session.user.email ?? ''}
           onAIConnections={() => setAIConnectionsOpen(true)}
@@ -612,7 +615,7 @@ function CollectionDashboard({ session }: { session: Session }) {
 
         {error && <p className="notice error">No se pudo actualizar la colección: {error}</p>}
         {activeView === 'collection' && starterImportMessage && <p className="notice success" role="status">{starterImportMessage}</p>}
-        {loading ? <LoadingScreen /> : activeView === 'collection' ? <>
+        {loading && activeView === 'collection' ? <LoadingScreen /> : activeView === 'collection' ? <>
           <section className="collection-overview" aria-label="Resumen de la colección">
             <Stat label="Cartas distintas" value={stats.unique.toLocaleString('es-ES')} />
             <Stat label="Copias totales" value={stats.copies.toLocaleString('es-ES')} />
@@ -651,17 +654,14 @@ function CollectionDashboard({ session }: { session: Session }) {
             </section>
           )}
           </> : <SetCollectionView entries={entries} ownershipForCard={ownershipForCard} onAddCopy={addCopy} />}
-        </> : activeView === 'catalog' ? <CatalogBrowser ownershipForCard={ownershipForCard} onAddCopy={addCopy} /> : <DeckStudio session={session} collection={entries} ownershipForCard={ownershipForCard} onAddCopy={addCopy} />}
+        </> : activeView === 'catalog' ? <CatalogBrowser ownershipForCard={ownershipForCard} onAddCopy={addCopy} /> : activeView === 'albums' ? <PublicAlbums ownershipForCard={ownershipForCard} onAddCopy={addCopy} /> : null}
+        <div hidden={activeView !== 'decks'}><DeckStudio session={session} collection={entries} ownershipForCard={ownershipForCard} onAddCopy={addCopy} /></div>
       </main>
       {selectedEntry && <CardViewer card={{ id: selectedEntry.card_id, name: selectedEntry.card_name, version: selectedEntry.card_version, imageUrl: selectedEntry.image_url, setCode: selectedEntry.set_code, setName: selectedEntry.set_name, collectorNumber: selectedEntry.collector_number, rarity: selectedEntry.rarity, ink: selectedEntry.ink, normalPriceEur: selectedEntry.normal_price_eur, foilPriceEur: selectedEntry.foil_price_eur, language: selectedEntry.language }} foil={effectiveCardFinish(selectedEntry.rarity, selectedEntry.finish) === 'FOIL'} canToggleFoil ownershipForCard={ownershipForCard} onAddCopy={addCopy} onClose={() => setSelectedEntry(null)} />}
       {arrivalCelebration && <ScanArrivalCelebration key={arrivalCelebration.nonce} entry={arrivalCelebration.entry} jackpot={arrivalCelebration.jackpot} />}
       {starterImporterOpen && <StarterDeckImporter catalog={catalogMetadata} busy={starterImportBusy} onClose={() => setStarterImporterOpen(false)} onImport={importStarterDeck} />}
       {aiConnectionsOpen && <AIConnections onClose={() => setAIConnectionsOpen(false)} />}
-      <nav className="app-bottom-nav" aria-label="Vistas de la cuenta">
-        <button className={activeView === 'collection' ? 'active' : ''} onClick={() => setActiveView('collection')}><Layers3 aria-hidden="true" />Colección</button>
-        <button className={activeView === 'catalog' ? 'active' : ''} onClick={() => setActiveView('catalog')}><LibraryBig aria-hidden="true" />Catálogo</button>
-        <button className={activeView === 'decks' ? 'active' : ''} onClick={() => setActiveView('decks')}><ListChecks aria-hidden="true" />Mazos</button>
-      </nav>
+      <nav className="app-bottom-nav" aria-label="Navegación principal"><AppNavigation view={activeView} onNavigate={setActiveView} /></nav>
     </div>
   )
 }
@@ -698,7 +698,7 @@ function AccountMenu({
 
   return (
     <div className={`account-menu${open ? ' open' : ''}`} ref={root}>
-      <button className="account-menu-trigger" onClick={() => setOpen((current) => !current)} aria-expanded={open} aria-haspopup="menu">
+      <button className="account-menu-trigger" aria-label={`Menú de cuenta: ${email}`} onClick={() => setOpen((current) => !current)} aria-expanded={open} aria-haspopup="menu">
         <CircleUserRound aria-hidden="true" />
         <span>{email}</span>
       </button>

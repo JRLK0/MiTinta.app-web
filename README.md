@@ -43,3 +43,16 @@ Mis mazos es una biblioteca independiente del editor: muestra cartas reales, tin
 El visor de cartas permite sumar y restar copias normales o foil mediante un contador. La resta usa una copia existente del acabado y la impresión seleccionados, incluso si está en otro idioma; nunca crea cantidades negativas. El acabado seleccionado se conserva al actualizar la colección y los controles se bloquean mientras se guarda.
 
 El visor incluye un enlace a la impresión seleccionada en Cardmarket, que abre otra pestaña. Los enlaces canónicos proceden de LorcanaJSON y se actualizan con `npm run sync:cardmarket-links`. Si no existe un enlace inequívoco para esa impresión, se ofrece una búsqueda por el nombre completo de la carta.
+
+
+### Navegación de la aplicación
+
+Las secciones comparten menú y dirección tanto con cuenta como sin ella:
+`/collection/?view=catalog`, `?view=albums`, `?view=collection` y `?view=decks`.
+Los álbumes conservan la edición con `album=<set>` y los mazos abiertos con
+`editor=<id>`. Atrás, Adelante y recargar mantienen estos destinos. Las vistas
+personales solicitan acceso y continúan en el destino elegido; cancelar regresa
+al punto de exploración anterior. Los enlaces públicos `?deck=<id>` se mantienen.
+
+El constructor identifica el campo «Nombre del mazo», conserva el borrador al
+cambiar de sección y permite ampliar el catálogo con «Mostrar más cartas».
