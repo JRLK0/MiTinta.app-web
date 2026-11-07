@@ -46,6 +46,7 @@ type Deck = {
 }
 
 type DeckEntry = DeckDraftEntry
+type DeckSnapshot = { deck: Deck; entries: DeckEntry[]; revision: string }
 
 function entryFromCard(card: CatalogCard, quantity = 1): DeckEntry {
   return {
@@ -112,13 +113,16 @@ export function DeckStudio({ session, collection, ownershipForCard, onAddCopy }:
   const [libraryError, setLibraryError] = useState('')
   const [openingId, setOpeningId] = useState<string | null>(null)
   const [activeId, setActiveId] = useState<string | null>(restoredDraft?.activeId ?? null)
+  const [baseRevision, setBaseRevision] = useState<string | null>(restoredDraft?.baseRevision ?? null)
+  const pendingSave = useRef<{ fingerprint: string; requestId: string } | null>(null)
+  const pendingDelete = useRef<{ fingerprint: string; requestId: string } | null>(null)
   const [name, setName] = useState(restoredDraft?.name ?? 'Mazo nuevo')
   const [description, setDescription] = useState(restoredDraft?.description ?? '')
   const [format, setFormat] = useState<DeckFormat | null>(restoredDraft?.format ?? null)
   const [importFormat, setImportFormat] = useState<DeckFormat | null>(null)
   const [isPublic, setIsPublic] = useState(restoredDraft?.isPublic ?? false)
   const [entries, setEntries] = useState<DeckEntry[]>(restoredDraft?.entries ?? [])
-  const [baseline, setBaseline] = useState(() => restoredDraft ? '' : deckEditorFingerprint({ activeId: null, name: 'Mazo nuevo', description: '', isPublic: false, format: null, entries: [] }))
+  const [baseline, setBaseline] = useState(() => restoredDraft ? '' : deckEditorFingerprint({ activeId: null, baseRevision: null, name: 'Mazo nuevo', description: '', isPublic: false, format: null, entries: [] }))
   const [filters, setFilters] = useState<CardFilterState>({ ...EMPTY_CARD_FILTERS })
   const [sort, setSort] = useState<CommonSortMode>('set')
   const [onlyAvailable, setOnlyAvailable] = useState(false)
@@ -133,8 +137,8 @@ export function DeckStudio({ session, collection, ownershipForCard, onAddCopy }:
   const [selectedCard, setSelectedCard] = useState<ViewerCard | null>(null)
 
   const editorState = useMemo<DeckEditorState>(
-    () => ({ activeId, name, description, isPublic, format, entries }),
-    [activeId, name, description, isPublic, format, entries],
+    () => ({ activeId, baseRevision, name, description, isPublic, format, entries }),
+    [activeId, baseRevision, name, description, isPublic, format, entries],
   )
   const editorFingerprint = useMemo(() => deckEditorFingerprint(editorState), [editorState])
   const isDirty = editorFingerprint !== baseline
@@ -192,13 +196,14 @@ export function DeckStudio({ session, collection, ownershipForCard, onAddCopy }:
 
   function applyEditor(next: DeckEditorState, saved: boolean) {
     setActiveId(next.activeId)
+    setBaseRevision(next.baseRevision ?? null)
     setName(next.name)
     setDescription(next.description)
     setIsPublic(next.isPublic)
     setFormat(next.format ?? null)
     setEntries(next.entries)
     if (saved) {
-      setBaseline(deckEditorFingerprint(next))
+      setBaseline(deckEditorFingerprint({ ...next, baseRevision: next.baseRevision ?? null }))
       window.localStorage.removeItem(draftKey)
     }
   }
@@ -226,16 +231,18 @@ export function DeckStudio({ session, collection, ownershipForCard, onAddCopy }:
   async function openDeck(deck: Deck) {
     if (!canDiscardDraft()) return
     setOpeningId(deck.id)
-    const { data, error } = await loadAllPages<DeckEntry>(async (from, to) => await supabase.from('deck_entries').select('*').eq('deck_id', deck.id).order('card_id').range(from, to))
+    const { data, error } = await supabase.rpc('get_own_deck_snapshot', { target_deck_id: deck.id })
     setOpeningId(null)
     if (error) return setMessage(storageError(error))
+    const snapshot = data as DeckSnapshot
     applyEditor({
-      activeId: deck.id,
-      name: deck.name,
-      description: deck.description,
-      isPublic: deck.is_public,
-      format: deck.format ?? null,
-      entries: (data ?? []) as DeckEntry[],
+      activeId: snapshot.deck.id,
+      baseRevision: snapshot.revision,
+      name: snapshot.deck.name,
+      description: snapshot.deck.description,
+      isPublic: snapshot.deck.is_public,
+      format: snapshot.deck.format ?? null,
+      entries: snapshot.entries,
     }, true)
     setMessage('')
     setScreen('editor')
@@ -271,45 +278,46 @@ export function DeckStudio({ session, collection, ownershipForCard, onAddCopy }:
   }
 
   async function saveDeck() {
+    if (saving) return
     if (!format) return setMessage('Elige Core o Infinity antes de guardar.')
     if (!name.trim()) return setMessage('Ponle un nombre al mazo.')
     if (validateDeck(entries).tooMany > 0) return setMessage('Reduce las copias que exceden el límite antes de guardar el mazo.')
+    if (activeId && !baseRevision) return setMessage('Este borrador es anterior al control de versiones. Conserva o exporta tus cambios y vuelve a abrir el mazo antes de guardarlo.')
     setSaving(true)
     setMessage('')
-    const deckPayload = { user_id: session.user.id, name: name.trim(), description: description.trim(), is_public: isPublic, format }
-    const currentActiveId = activeId
-    const result = currentActiveId
-      ? await supabase.from('decks').update(deckPayload).eq('id', activeId).select().single()
-      : await supabase.from('decks').insert(deckPayload).select().single()
-    if (result.error) {
-      setSaving(false)
-      return setMessage(storageError(result.error))
-    }
-    const deck = result.data as Deck
-    if (!currentActiveId) setActiveId(deck.id)
-    const { error } = await supabase.rpc('replace_deck_entries', {
-      target_deck_id: deck.id,
-      entries: entries.map(({ deck_id: _deckId, ...entry }) => entry),
-    })
-    setSaving(false)
-    if (error) {
+    if (pendingSave.current?.fingerprint !== editorFingerprint) pendingSave.current = { fingerprint: editorFingerprint, requestId: crypto.randomUUID() }
+    try {
+      const { data, error } = await supabase.rpc('save_deck_atomic', {
+        request_id: pendingSave.current.requestId, target_deck_id: activeId, expected_revision: baseRevision,
+        metadata: { name: name.trim(), description: description.trim(), is_public: isPublic, format },
+        entries: entries.map(({ deck_id: _deckId, ...entry }) => entry), replace_entries: true,
+      })
+      if (error) return setMessage((error.code === '40001' || error.code === 'PT409') ? 'El mazo cambió desde que lo abriste. Tu borrador está conservado: exporta tus cambios y vuelve a abrir el mazo para revisarlos.' : storageError(error))
+      const saved = data as DeckSnapshot
+      applyEditor({ ...editorState, activeId: saved.deck.id, baseRevision: saved.revision, name: saved.deck.name, description: saved.deck.description, isPublic: saved.deck.is_public, entries: saved.entries }, true)
+      pendingSave.current = null
+      setMessage(formatIssues.length ? `Borrador guardado · ${formatIssues.length} cartas pendientes para ${formatName(format)}.` : 'Mazo guardado.')
       await loadDecks()
-      return setMessage(`El mazo se creó, pero faltó guardar la lista. Reintenta: ${error.message}`)
-    }
-    const savedState = { ...editorState, activeId: deck.id, name: deck.name, description: deck.description, isPublic: deck.is_public }
-    applyEditor(savedState, true)
-    setMessage(formatIssues.length ? `Borrador guardado · ${formatIssues.length} cartas pendientes para ${formatName(format)}.` : 'Mazo guardado.')
-    await loadDecks()
+    } catch { setMessage('No se pudo confirmar el guardado. Tu borrador sigue aquí; pulsa Guardar para reintentar sin duplicarlo.') }
+    finally { setSaving(false) }
   }
 
   async function deleteDeck() {
+    if (saving) return
     if (!activeId || !window.confirm('¿Eliminar este mazo?')) return
-    const { error } = await supabase.from('decks').delete().eq('id', activeId)
-    if (error) return setMessage(storageError(error))
-    applyEditor({ activeId: null, name: 'Mazo nuevo', description: '', isPublic: false, format: null, entries: [] }, true)
-    setMessage('')
-    setScreen('library')
-    await loadDecks()
+    if (!baseRevision) return setMessage('Vuelve a abrir el mazo antes de eliminarlo.')
+    const fingerprint = `${activeId}:${baseRevision}`
+    if (pendingDelete.current?.fingerprint !== fingerprint) pendingDelete.current = { fingerprint, requestId: crypto.randomUUID() }
+    setSaving(true)
+    try {
+      const { error } = await supabase.rpc('delete_deck_atomic', { request_id: pendingDelete.current.requestId, target_deck_id: activeId, expected_revision: baseRevision })
+      if (error) return setMessage((error.code === '40001' || error.code === 'PT409') ? 'El mazo cambió. Vuelve a abrirlo antes de eliminarlo.' : storageError(error))
+      pendingDelete.current = null
+      applyEditor({ activeId: null, baseRevision: null, name: 'Mazo nuevo', description: '', isPublic: false, format: null, entries: [] }, true)
+      setMessage(''); setScreen('library')
+      await loadDecks()
+    } catch { setMessage('No se pudo confirmar la eliminación. Puedes reintentarlo.') }
+    finally { setSaving(false) }
   }
 
   async function copyShareLink() {

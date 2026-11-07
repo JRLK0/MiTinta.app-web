@@ -1,12 +1,14 @@
 import { checkedQuantity, externalCsvCell as csvCell, storageError } from './importSecurity'
 import { collectionCopyTarget } from './collectionCopyTarget'
 import { ThemeToggle } from '../../shared/ThemeToggle'
+import { AIConnections } from './AIConnections'
 import { FanCredit } from '../../shared/FanCredit'
 import { GuestDashboard } from './GuestDashboard'
 import { CSSProperties, FormEvent, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import type { Session } from '@supabase/supabase-js'
 import {
   CircleUserRound,
+  Bot,
   Cloud,
   Layers3,
   LibraryBig,
@@ -256,6 +258,7 @@ function PasswordRecoveryScreen({ onComplete }: { onComplete: () => void }) {
 }
 
 function CollectionDashboard({ session }: { session: Session }) {
+  const [aiConnectionsOpen, setAIConnectionsOpen] = useState(false)
   const [entries, setEntries] = useState<CollectionEntry[]>([])
   const [catalogMetadata, setCatalogMetadata] = useState<CatalogCard[]>([])
   const [loading, setLoading] = useState(true)
@@ -587,6 +590,7 @@ function CollectionDashboard({ session }: { session: Session }) {
           </nav>
         <div className="header-actions"><ThemeToggle /><AccountMenu
           email={session.user.email ?? ''}
+          onAIConnections={() => setAIConnectionsOpen(true)}
           soundEnabled={soundEnabled}
           onToggleSound={() => {
             const next = !soundEnabled
@@ -652,6 +656,7 @@ function CollectionDashboard({ session }: { session: Session }) {
       {selectedEntry && <CardViewer card={{ id: selectedEntry.card_id, name: selectedEntry.card_name, version: selectedEntry.card_version, imageUrl: selectedEntry.image_url, setCode: selectedEntry.set_code, setName: selectedEntry.set_name, collectorNumber: selectedEntry.collector_number, rarity: selectedEntry.rarity, ink: selectedEntry.ink, normalPriceEur: selectedEntry.normal_price_eur, foilPriceEur: selectedEntry.foil_price_eur, language: selectedEntry.language }} foil={effectiveCardFinish(selectedEntry.rarity, selectedEntry.finish) === 'FOIL'} canToggleFoil ownershipForCard={ownershipForCard} onAddCopy={addCopy} onClose={() => setSelectedEntry(null)} />}
       {arrivalCelebration && <ScanArrivalCelebration key={arrivalCelebration.nonce} entry={arrivalCelebration.entry} jackpot={arrivalCelebration.jackpot} />}
       {starterImporterOpen && <StarterDeckImporter catalog={catalogMetadata} busy={starterImportBusy} onClose={() => setStarterImporterOpen(false)} onImport={importStarterDeck} />}
+      {aiConnectionsOpen && <AIConnections onClose={() => setAIConnectionsOpen(false)} />}
       <nav className="app-bottom-nav" aria-label="Vistas de la cuenta">
         <button className={activeView === 'collection' ? 'active' : ''} onClick={() => setActiveView('collection')}><Layers3 aria-hidden="true" />Colección</button>
         <button className={activeView === 'catalog' ? 'active' : ''} onClick={() => setActiveView('catalog')}><LibraryBig aria-hidden="true" />Catálogo</button>
@@ -663,12 +668,14 @@ function CollectionDashboard({ session }: { session: Session }) {
 
 function AccountMenu({
   email,
+  onAIConnections,
   soundEnabled,
   onToggleSound,
   onDeleteAccount,
   onSignOut,
 }: {
   email: string
+  onAIConnections: () => void
   soundEnabled: boolean
   onToggleSound: () => void
   onDeleteAccount: () => void
@@ -697,6 +704,7 @@ function AccountMenu({
       </button>
       {open && (
         <div className="account-menu-panel" role="menu">
+          <button type="button" role="menuitem" onClick={() => { setOpen(false); onAIConnections() }}><Bot aria-hidden="true" />Conexiones de IA</button>
           <button type="button" role="menuitem" onClick={() => { onToggleSound(); }}>
             {soundEnabled ? <Volume2 /> : <VolumeX />}
             {soundEnabled ? 'Silenciar cartas valiosas' : 'Sonido de cartas valiosas'}

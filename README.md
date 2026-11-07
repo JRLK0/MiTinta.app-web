@@ -14,6 +14,10 @@ npm run build
 
 Desde el repositorio Android, `web/` apunta a este repositorio como submódulo.
 
+## Conexión con IA
+
+MiTinta ofrece un MCP remoto en **https://lorcana-mcp.mitinta.app/mcp** para consultar la colección, calcular faltantes y gestionar los mazos propios con autorización por usuario. En la cuenta de la web, **Conexiones de IA** permite consultar y revocar accesos. La colección es siempre de solo lectura. Consulta [la integración MCP](mcp/README.md) para herramientas, permisos, pruebas y despliegue.
+
 ## Publicación en Cloudflare
 
 `npm run build:cloudflare` compila únicamente archivos públicos en `dist/` y genera `.cloudflare/output/v0/`. `MITINTA_CUSTOM_DOMAINS=1 npm run deploy:cloudflare` publica con `cf` en `mitinta.app` y `www.mitinta.app`; sin esa variable publica solo la vista previa del Worker. En PowerShell se define la variable con `$env:MITINTA_CUSTOM_DOMAINS='1'`.

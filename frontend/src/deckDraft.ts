@@ -22,6 +22,7 @@ export type DeckEditorState = {
   description: string
   isPublic: boolean
   format?: DeckFormat | null
+  baseRevision?: string | null
   entries: DeckDraftEntry[]
 }
 
@@ -51,6 +52,7 @@ export function parseDeckDraft(value: string | null, expectedUserId: string): De
       typeof draft.name !== 'string' || typeof draft.description !== 'string' ||
       typeof draft.isPublic !== 'boolean' || !Array.isArray(draft.entries) ||
       !(draft.format == null || draft.format === 'core' || draft.format === 'infinity') ||
+      !(draft.baseRevision == null || (typeof draft.baseRevision === 'string' && /^[a-f0-9]{64}$/.test(draft.baseRevision))) ||
       typeof draft.updatedAt !== 'string' ||
       !(draft.activeId === null || typeof draft.activeId === 'string') ||
       draft.entries.some((entry) => (

@@ -1,0 +1,20 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "mitinta-lorcana-mcp",
+  "main": "src/index.ts",
+  "account_id": "5aa681405f165ae8194e10aacdb0d93e",
+  "compatibility_date": "2026-11-07",
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+  "workers_dev": false,
+  "preview_urls": false,
+  "routes": [{ "pattern": "lorcana-mcp.mitinta.app", "custom_domain": true }],
+  "d1_databases": [{ "binding": "DB", "database_name": "mitinta-lorcana-mcp", "database_id": "d32736c4-af06-49f1-a363-62e0f1b94df2" }],
+  "kv_namespaces": [{ "binding": "OAUTH_KV", "id": "77eacf043a624af8afd7b94f0d2fe16d" }],
+  "vars": { "BASE_URL": "https://lorcana-mcp.mitinta.app", "WEB_ORIGIN": "https://mitinta.app" },
+  "observability": {
+    "enabled": true,
+    "redact_query_string": true,
+    "logs": { "enabled": true, "invocation_logs": false },
+    "traces": { "enabled": true, "head_sampling_rate": 0.01 }
+  }
+}

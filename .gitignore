@@ -6,3 +6,6 @@ node_modules/
 dist/
 .cache/
 .cloudflare/
+.private/
+.wrangler/
+.dev.vars

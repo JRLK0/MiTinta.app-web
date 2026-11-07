@@ -7,7 +7,7 @@ const contentSecurityPolicy = [
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data: blob: https://cards.lorcast.io https://cards.duels.ink",
   "font-src 'self'",
-  "connect-src 'self' https://api.lorcast.com https://wedzkhkkqilokvfmzyuv.supabase.co wss://wedzkhkkqilokvfmzyuv.supabase.co https://api.mitinta.app wss://api.mitinta.app",
+  "connect-src 'self' https://api.lorcast.com https://wedzkhkkqilokvfmzyuv.supabase.co wss://wedzkhkkqilokvfmzyuv.supabase.co https://api.mitinta.app wss://api.mitinta.app https://lorcana-mcp.mitinta.app",
   "media-src 'self'",
   "object-src 'none'",
   "base-uri 'none'",
